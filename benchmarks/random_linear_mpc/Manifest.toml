@@ -482,6 +482,8 @@ version = "0.2.1"
 [[RobotZoo]]
 deps = ["LinearAlgebra", "Parameters", "RobotDynamics", "Rotations", "StaticArrays"]
 git-tree-sha1 = "7c918fa028d9e3056e76dbe214db2ed877e013e0"
+repo-rev = "master"
+repo-url = "https://github.com/bjack205/RobotZoo.jl.git"
 uuid = "74be38bb-dcc2-4b9e-baf3-d6373cd95f10"
 version = "0.1.1"
 
