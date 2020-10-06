@@ -1,4 +1,14 @@
 using SparseArrays, Random
+using TrajectoryOptimization
+using Altro
+using BenchmarkTools
+using JuMP
+using MATLAB
+using OSQP
+using ParameterJuMP
+using RobotDynamics
+using RobotZoo
+using StaticArrays
 
 Random.seed!(1234)
 
@@ -17,7 +27,10 @@ B = [0.005 0;
      0     0.005;
      .1    0;
      0     .1]
+# cd("/Users/kevintracy/devel/altro-mpc-icra2021/benchmarks/
+# random_linear_mpc/kevin_osqp_check")
 
+# @load "STM_ts.jld2" Ad Bd
 
 Q = Diagonal(10*rand(n))
 R = Diagonal(0.1*ones(m))
@@ -45,9 +58,9 @@ add_constraint!(constraints, bound, 1:N)
 
 tf = (N-1)*dt
 
-problem = Problem(model, objective, xf, tf, x0=x0, integration=RD.PassThrough)
+problem = Problem(model, objective, xf, tf, x0=x0, constraints=constraints, integration=RD.PassThrough)
 solver = ALTROSolver(problem)
-set_options!(solver)
+set_options!(solver, projected_newton=false)
 solve!(solver)
 
 b = benchmark_solve!(solver)
@@ -76,8 +89,8 @@ for i = 1:length(X_altro)
             @assert norm(X_altro[i+1] - (A*X_altro[i] + B*U_altro[i]))<1e-13
 
             #TODO: both of these will fail when uncommented
-            # @assert U_altro[i] < (ū .+ 1e-6)
-            # @assert U_altro[i] > -(ū .+ 1e-6)
+            @assert U_altro[i] < (ū .+ 1e-6)
+            @assert U_altro[i] > -(ū .+ 1e-6)
       end
 end
 
@@ -147,7 +160,7 @@ u = [ueq; uineq]
 # create OSQP object
 m = OSQP.Model()
 # setup problem
-OSQP.setup!(m; P=P, q=q, A=A, l=l, u=u, eps_abs = 1e-9, eps_rel = 1e-9, eps_prim_inf = 1e-9, eps_dual_inf = 1e-9)
+OSQP.setup!(m; P=P, q=q, A=A, l=l, u=u, eps_abs = 1e-6, eps_rel = 1e-6, eps_prim_inf = 1e-6, eps_dual_inf = 1e-6)
 # OSQP.setup!(m; P=P, q=q, A=A, l=l, u=u, eps_abs = 1e-7)
 # solve
 results = OSQP.solve!(m)
@@ -155,21 +168,21 @@ results = OSQP.solve!(m)
 X_osqp,U_osqp = OSQP_postprocess_mpc(results,N,nx,nu)
 
 
-# my own cost
-J2 = [0.0]
-for i = 1:size(X_osqp,2)
-      if i < size(X_osqp,2)
-            J2[1] += .5*X_osqp[:,i]'*Q*X_osqp[:,i] + .5*U_osqp[:,i]'*R*U_osqp[:,i]
-      else
-            J2[1] += .5*X_osqp[:,i]'*Q*X_osqp[:,i]
-      end
-
-      @assert X_osqp[:,i] < (x̄ .+ 1e-6)
-      @assert X_osqp[:,i] > -(x̄ .+ 1e-6)
-
-      if i < size(X_osqp,2)
-            @assert norm(X_osqp[:,i+1] - (Ad*X_osqp[:,i] + Bd*U_osqp[:,i]))<1e-12
-            @assert U_osqp[:,i] < (ū .+ 1e-6)
-            @assert U_osqp[:,i] > -(ū .+ 1e-6)
-      end
-end
+# # my own cost
+# J2 = [0.0]
+# for i = 1:size(X_osqp,2)
+#       if i < size(X_osqp,2)
+#             J2[1] += .5*X_osqp[:,i]'*Q*X_osqp[:,i] + .5*U_osqp[:,i]'*R*U_osqp[:,i]
+#       else
+#             J2[1] += .5*X_osqp[:,i]'*Q*X_osqp[:,i]
+#       end
+#
+#       @assert X_osqp[:,i] < (x̄ .+ 1e-6)
+#       @assert X_osqp[:,i] > -(x̄ .+ 1e-6)
+#
+#       if i < size(X_osqp,2)
+#             @assert norm(X_osqp[:,i+1] - (Ad*X_osqp[:,i] + Bd*U_osqp[:,i]))<1e-6
+#             @assert U_osqp[:,i] < (ū .+ 1e-3)
+#             @assert U_osqp[:,i] > -(ū .+ 1e-3)
+#       end
+# end
