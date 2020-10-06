@@ -10,10 +10,34 @@ using RobotDynamics
 using RobotZoo
 using StaticArrays
 
+function eye(n::Int)
+      return diagm(ones(n))
+end
+function speye(n::Int)
+      sparse(eye(n))
+end
+function OSQP_postprocess_mpc(results,N,nx,nu)
+      X = zeros(nx,N+1)
+      U = zeros(nu,N)
+      x_vec = results.x[1:(N+1)*nx]
+      u_vec = results.x[(1+(N+1)*nx):end]
+      for i = 1:N+1
+            index_first = 1 + (i-1)*nx
+            index_last = index_first + (nx-1)
+            X[:,i] = x_vec[index_first:index_last]
+      end
+      for i = 1:N
+            index_first = 1 + (i-1)*nu
+            index_last = index_first + (nu-1)
+            U[:,i] = u_vec[index_first:index_last]
+      end
+      return X, U
+end
+
 Random.seed!(1234)
 
-include(joinpath(dirname(dirname(@__FILE__)),"random_linear.jl"))
-println("----------new run--------")
+# include(joinpath(dirname(dirname(@__FILE__)),"random_linear.jl"))
+# println("----------new run--------")
 
 N = 10
 
@@ -27,15 +51,12 @@ B = [0.005 0;
      0     0.005;
      .1    0;
      0     .1]
-# cd("/Users/kevintracy/devel/altro-mpc-icra2021/benchmarks/
-# random_linear_mpc/kevin_osqp_check")
 
-# @load "STM_ts.jld2" Ad Bd
 
 Q = Diagonal(10*rand(n))
 R = Diagonal(0.1*ones(m))
 
-Qf = copy(Q) #dare(A, B, Q, R)
+Qf = copy(Q)
 
 x̄ = rand(n) .+ 1
 ū = 0.1*rand(m)
@@ -72,55 +93,10 @@ b = benchmark_solve!(solver)
 X_altro = states(solver)
 U_altro = controls(solver)
 
-# get my own cost
-J = [0.0]
-for i = 1:length(X_altro)
-      if i < length(X_altro)
-            J[1] += .5*X_altro[i]'*Q*X_altro[i] + .5*U_altro[i]'*R*U_altro[i]
-      else
-            J[1] += .5*X_altro[i]'*Q*X_altro[i]
-      end
-      # dynamics constraint
 
-      @assert X_altro[i] < (x̄ .+ 1e-6)
-      @assert X_altro[i] > -(x̄ .+ 1e-6)
-      @show i
-      if i < length(X_altro)
-            @assert norm(X_altro[i+1] - (A*X_altro[i] + B*U_altro[i]))<1e-13
-
-            #TODO: both of these will fail when uncommented
-            @assert U_altro[i] < (ū .+ 1e-6)
-            @assert U_altro[i] > -(ū .+ 1e-6)
-      end
-end
-
-#osqp part
-println("OSQP part")
 
 println("OSQP part 2")
-function eye(n::Int)
-      return diagm(ones(n))
-end
-function speye(n::Int)
-      sparse(eye(n))
-end
-function OSQP_postprocess_mpc(results,N,nx,nu)
-      X = zeros(nx,N+1)
-      U = zeros(nu,N)
-      x_vec = results.x[1:(N+1)*nx]
-      u_vec = results.x[(1+(N+1)*nx):end]
-      for i = 1:N+1
-            index_first = 1 + (i-1)*nx
-            index_last = index_first + (nx-1)
-            X[:,i] = x_vec[index_first:index_last]
-      end
-      for i = 1:N
-            index_first = 1 + (i-1)*nu
-            index_last = index_first + (nu-1)
-            U[:,i] = u_vec[index_first:index_last]
-      end
-      return X, U
-end
+
 
 N = N-1
 Ad = copy(A)
@@ -168,21 +144,29 @@ results = OSQP.solve!(m)
 X_osqp,U_osqp = OSQP_postprocess_mpc(results,N,nx,nu)
 
 
-# # my own cost
-# J2 = [0.0]
-# for i = 1:size(X_osqp,2)
-#       if i < size(X_osqp,2)
-#             J2[1] += .5*X_osqp[:,i]'*Q*X_osqp[:,i] + .5*U_osqp[:,i]'*R*U_osqp[:,i]
-#       else
-#             J2[1] += .5*X_osqp[:,i]'*Q*X_osqp[:,i]
-#       end
-#
-#       @assert X_osqp[:,i] < (x̄ .+ 1e-6)
-#       @assert X_osqp[:,i] > -(x̄ .+ 1e-6)
-#
-#       if i < size(X_osqp,2)
-#             @assert norm(X_osqp[:,i+1] - (Ad*X_osqp[:,i] + Bd*U_osqp[:,i]))<1e-6
-#             @assert U_osqp[:,i] < (ū .+ 1e-3)
-#             @assert U_osqp[:,i] > -(ū .+ 1e-3)
-#       end
-# end
+
+# now we compare an MPC start
+x0_new = x0 + .02*randn(length(x0))
+
+# ALTRO MPC start
+# problem = Problem(model, objective, xf, tf, x0=x0, constraints=constraints, integration=RD.PassThrough)
+# solver = ALTROSolver(problem)
+problem.x0 .= x0_new
+set_options!(solver, projected_newton=false,penalty_initial = 10.0)
+solve!(solver)
+
+b = benchmark_solve!(solver)
+
+@show maximum(b)
+@show max_violation(solver)
+@show cost(solver)
+
+
+# OSQP mpc start
+l_new = copy(l)
+l_new[1:nx] = x0_new
+u_new = copy(l_new)
+
+OSQP.update!(m; l = l_new,u = u_new)
+
+results = OSQP.solve!(m)
