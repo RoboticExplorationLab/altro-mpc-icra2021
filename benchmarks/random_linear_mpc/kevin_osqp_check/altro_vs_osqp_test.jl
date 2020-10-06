@@ -9,6 +9,7 @@ using ParameterJuMP
 using RobotDynamics
 using RobotZoo
 using StaticArrays
+const RD = RobotDynamics
 
 function eye(n::Int)
       return diagm(ones(n))
@@ -39,18 +40,13 @@ Random.seed!(1234)
 # include(joinpath(dirname(dirname(@__FILE__)),"random_linear.jl"))
 # println("----------new run--------")
 
-N = 10
+function test_mpc()
 
-n = 4
-m = 2
-A = [1 0 .1 0;
-     0 1 0 .1;
-     0 0 1  0;
-     0 0 0  1]
-B = [0.005 0;
-     0     0.005;
-     .1    0;
-     0     .1]
+@load "A_B_flexsat" Ad Bd
+A = copy(Ad)
+B = copy(Bd)
+N = 50
+n,m = size(B)
 
 
 Q = Diagonal(10*rand(n))
@@ -58,23 +54,17 @@ R = Diagonal(0.1*ones(m))
 
 Qf = copy(Q)
 
-x̄ = rand(n) .+ 1
-ū = 0.1*rand(m)
-x0 = (rand(n) .- 1) .* x̄ * 0.5
+# x̄ = rand(n) .+ 1
+ū = .01*ones(m)
+# x0 = (rand(n) .- 1) .* x̄ * 0.5
 xf = zeros(n)
-
-using Altro
-using TrajectoryOptimization
-using RobotDynamics
-
-const RD = RobotDynamics
-
+x0 = [.1;.1;.1;zeros(n-3)]
 dt = 0.1 # doesn't matter, just needs to be non-zero
 model = RD.LinearModel(A, B;dt = .1)
 objective = LQRObjective(Q, R, Qf, xf, N)
 
 constraints = ConstraintList(n, m, N)
-bound = BoundConstraint(n, m, x_min=-x̄, x_max=x̄, u_min=-ū, u_max=ū)
+bound = BoundConstraint(n, m, u_min=-ū, u_max=ū)
 add_constraint!(constraints, bound, 1:N)
 
 tf = (N-1)*dt
@@ -97,7 +87,7 @@ U_altro = controls(solver)
 
 println("OSQP part 2")
 
-
+#
 N = N-1
 Ad = copy(A)
 Bd = copy(B)
@@ -105,8 +95,8 @@ nx, nu = size(Bd)
 umin = -ū
 umax = ū
 
-xmin = -x̄
-xmax = x̄
+xmin = -Inf*ones(nx)
+xmax = Inf*ones(nx)
 # Objective function
 QN = Qf
 xr = xf
@@ -124,7 +114,7 @@ B_first_part = diagm(-1 => ones(N))
 Bu = kron(B_first_part[:,1:end-1], Bd)
 Aeq = [Ax Bu]
 leq = [-x0; zeros(N*nx)]
-ueq = leq
+ueq = copy(leq)
 # input ad state constraints
 Aineq = speye((N+1)*nx + N*nu)
 lineq = ([kron(ones(N+1),xmin) ; kron(ones(N),umin)])
@@ -145,28 +135,56 @@ X_osqp,U_osqp = OSQP_postprocess_mpc(results,N,nx,nu)
 
 
 
-# now we compare an MPC start
-x0_new = x0 + .02*randn(length(x0))
 
-# ALTRO MPC start
-# problem = Problem(model, objective, xf, tf, x0=x0, constraints=constraints, integration=RD.PassThrough)
-# solver = ALTROSolver(problem)
-problem.x0 .= x0_new
-set_options!(solver, projected_newton=false,penalty_initial = 10.0)
-solve!(solver)
+mpc_iterations = 30
 
-b = benchmark_solve!(solver)
+osqp_times = zeros(mpc_iterations)
+altro_times = zeros(mpc_iterations)
 
-@show maximum(b)
-@show max_violation(solver)
-@show cost(solver)
+for i = 1:mpc_iterations
+
+      # now we compare an MPC start
+      x0_new = x0 + .002*randn(length(x0))
+
+      # ALTRO MPC start
+      problem.x0 .= x0_new
+      set_options!(solver, projected_newton=false,penalty_initial = 10.0)
+      solve!(solver)
+      altro_times[i] = solver.stats.tsolve
 
 
-# OSQP mpc start
-l_new = copy(l)
-l_new[1:nx] = x0_new
-u_new = copy(l_new)
+      # OSQP mpc start
+      leq = [-x0_new; zeros(N*nx)]
+      ueq = copy(leq)
+      l_new = [leq; lineq]
+      u_new = [ueq; uineq]
 
-OSQP.update!(m; l = l_new,u = u_new)
+      OSQP.update!(m; l = l_new,u = u_new)
+      results = OSQP.solve!(m)
+      osqp_times[i] = results.info.solve_time*1e3
 
-results = OSQP.solve!(m)
+      # @infiltrate
+      # error()
+
+end
+
+X_osqp,U_osqp = OSQP_postprocess_mpc(results,N,nx,nu)
+
+return osqp_times, altro_times, X_osqp, states(solver)
+end
+
+
+osqp_times, altro_times, X_osqp, X_altro = test_mpc()
+
+
+mat"
+figure
+hold on
+plot($osqp_times,'*')
+plot($altro_times,'o')
+ylabel('Solve Time (ms)')
+xlabel('Iterations')
+legend('OSQP','ALTRO')
+%ylim([0,10])
+hold off
+"
