@@ -45,7 +45,7 @@ function test_mpc()
 @load "A_B_flexsat" Ad Bd
 A = copy(Ad)
 B = copy(Bd)
-N = 50
+N = 200
 n,m = size(B)
 
 
