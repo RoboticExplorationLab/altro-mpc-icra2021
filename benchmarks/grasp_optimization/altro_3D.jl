@@ -12,7 +12,7 @@ include("src/visualize.jl")
 n = 6
 m = 6
 g = @SVector [0, 0, -9.81] # gravity
-mu = .5                 # friction constant
+mu = .8                # friction constant
 mass = .2               # mass
 j = 1.                  # inertia
 f = 3.                  # max grasp force
@@ -49,8 +49,8 @@ add_constraint!(conSet, goal, N)
 p1_0 = [0., -1, 0]
 p2_0 = [0, 1, 0]
 B = [skew(p1_0) skew(p2_0)]
-tb = LinearConstraint(n, m, B, [0.,0,0], Equality(), u_ind)
-# add_constraint!(conSet, tb, 1:N-1)
+t_bal = LinearConstraint(n, m, B, [0.,0,0], Equality(), u_ind)
+add_constraint!(conSet, t_bal, 1:N-1)
 
 # Max Grasp Force
 v1_0 = [0., 1, 0]
@@ -59,10 +59,16 @@ A = zeros(2, m)
 A[1,1:Int(m/2)] = v1_0
 A[2,1+Int(m/2):end] = v2_0
 b = model.f*ones(2)
-tb = LinearConstraint(n, m, A, b, Inequality(), u_ind)
-# add_constraint!(conSet, tb, 1:N-1)
+max_f = LinearConstraint(n, m, A, b, Inequality(), u_ind)
+add_constraint!(conSet, max_f, 1:N-1)
 
-# Friction Cone
+# Linear friction Cone
+# A = [0. -.8 1 0 0 0; 0 0 0 0 .8 1]
+# b = zeros(2)
+# fc = LinearConstraint(n, m, A, b, Inequality(), u_ind)
+# add_constraint!(conSet, fc, 1:N-1)
+
+# SOCP friction Cone
 include("src/new_constraints.jl")
 
 A1 = (I - v1_0*v1_0')
@@ -98,27 +104,39 @@ solve!(altro)
 X = states(altro)
 U = controls(altro)
 
-x = [X[t][2] for t = 1:N]
-y = [X[t][3] for t = 1:N]
-xd = [X[t][5] for t = 1:N]
-yd = [X[t][6] for t = 1:N]
+x = [X[t][1] for t = 1:N]
+y = [X[t][2] for t = 1:N]
+z = [X[t][3] for t = 1:N]
+xd = [X[t][4] for t = 1:N]
+yd = [X[t][5] for t = 1:N]
+zd = [X[t][6] for t = 1:N]
+
 F1 = [U[t][2:3] for t = 1:N-1]
 F2 = [U[t][5:6] for t = 1:N-1]
 
 # visualize
 anim = Animation()
 for t = 1:N-1
-    global F1, F2, x, y, model
+    global F1, F2, y, z, model
     local p, F
     p = [[-1, 0], [1, 0]]
     F = [F1[t], F2[t]]
-    visualize_square([x[t],y[t]], 0., p, F, model.mass*model.g[2:3], r=1)
+    visualize_square([y[t],z[t]], 0., p, F, model.mass*model.g[2:3], r=1)
     frame(anim)
 end
 gif(anim, string(@__DIR__,"/altro_3D.gif"), fps=2)
+
+plot([x y z xd yd zd])
+png(string(@__DIR__,"/altro_3D.png"))
 
 """
 Solve Statistics
   Total Iterations: 21
   Solve Time: 461.56739999999996 (ms)
 """
+
+# verify in friction cone
+# t=1
+# z = KnotPoint(X[t], U[t], dt)
+# x = TO.evaluate(nc1, z)
+# @show in(x, TO.SecondOrderCone())

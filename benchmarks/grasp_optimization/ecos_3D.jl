@@ -92,6 +92,7 @@ end
 gif(anim, string(@__DIR__, "/ecos_3D.gif"), fps=2)
 
 plot(Z.value')
+png(string(@__DIR__, "/ecos_3D.png"))
 
 """
 OPTIMAL (within feastol=8.2e-09, reltol=8.9e-10, abstol=1.4e-07).

@@ -1,11 +1,11 @@
-import Pkg; Pkg.activate(string(@__DIR__,"/..")); Pkg.instantiate();
+import Pkg; Pkg.activate(string(@__DIR__,"/../..")); Pkg.instantiate();
 using TrajectoryOptimization
 const TO = TrajectoryOptimization
 using StaticArrays, LinearAlgebra
 using RobotDynamics
 using Plots
-include("grasp_model.jl")
-include("visualize.jl")
+include(string(@__DIR__, "/grasp_model.jl"))
+include(string(@__DIR__, "/visualize.jl"))
 
 g = [0, -9.81] # gravity
 mu = .5     # friction constant
@@ -51,7 +51,7 @@ tb = LinearConstraint(n, m, A, b, Inequality(), 5:8)
 add_constraint!(conSet, tb, 1:N-1)
 
 # Friction Cone
-include("new_constraints.jl")
+include(string(@__DIR__, "/new_constraints.jl"))
 v1_0 = [-1., 0]
 v2_0 = [1., 0]
 
