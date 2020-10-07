@@ -84,21 +84,29 @@ add_constraint!(conSet, nc2, 1:N-1)
 # Problem
 prob = Problem(model, obj, xf, tf, x0=x0, constraints=conSet);
 
-u0 = @SVector [0, 0, model.mass*9.81/2, 0, 0, model.mass*9.81/2]
+u0 = @SVector [0, 1, model.mass*9.81/2, 0, -1, model.mass*9.81/2]
 U0 = [u0 for k = 1:N-1]
 initial_controls!(prob, U0)
 rollout!(prob);
 
 using Altro
 opts = SolverOptions(
-    cost_tolerance_intermediate=1e-2,
+    verbose = 0,
+    projected_newton_tolerance=1e-3,
+    cost_tolerance_intermediate=1e-3,
     penalty_scaling=10.,
-    penalty_initial=1.0
+    penalty_initial=4.0
 )
 
+# normal solve
 altro = ALTROSolver(prob, opts)
 set_options!(altro, show_summary=true)
 solve!(altro)
+
+# benchmark solve
+# altro = ALTROSolver(prob, opts)
+# set_options!(altro, show_summary=false)
+# benchmark_solve!(altro)
 
 # extract results
 X = states(altro)
@@ -124,19 +132,19 @@ for t = 1:N-1
     visualize_square([y[t],z[t]], 0., p, F, model.mass*model.g[2:3], r=1)
     frame(anim)
 end
-gif(anim, string(@__DIR__,"/altro_3D.gif"), fps=2)
+# gif(anim, string(@__DIR__,"/altro_3D.gif"), fps=2)
 
 plot([x y z xd yd zd])
-png(string(@__DIR__,"/altro_3D.png"))
+# png(string(@__DIR__,"/altro_3D.png"))
 
 """
 Solve Statistics
-  Total Iterations: 21
-  Solve Time: 461.56739999999996 (ms)
+  Total Iterations: 42
+  Solve Time: 208.64059899999998 (ms)
 """
 
 # verify in friction cone
-# t=1
-# z = KnotPoint(X[t], U[t], dt)
-# x = TO.evaluate(nc1, z)
-# @show in(x, TO.SecondOrderCone())
+t=1
+z1 = KnotPoint(X[t], U[t], dt)
+x1 = TO.evaluate(nc1, z1)
+@show x1
