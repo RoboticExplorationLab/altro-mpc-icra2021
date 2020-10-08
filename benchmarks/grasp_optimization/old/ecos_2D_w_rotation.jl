@@ -38,7 +38,7 @@ v2 = [rot(θ[t])*v2_0 for t = 1:T]
 B1 = [[-p1[t][2] p1[t][1]] for t = 1:T]
 B2 = [[-p2[t][2] p2[t][1]] for t = 1:T]
 
-o = SquareObject(mu, mass, j, f, g, [p1, p2], [v1, v2], [B1, B2])
+o = SquareObject(n, m, mu, mass, j, f, g, [p1, p2], [v1, v2], [B1, B2])
 
 # variables
 F1 = Variable(2, T-1)
