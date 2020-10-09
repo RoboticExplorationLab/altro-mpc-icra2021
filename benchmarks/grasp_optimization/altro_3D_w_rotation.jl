@@ -9,33 +9,8 @@ using BenchmarkTools
 include("src/grasp_model.jl")
 include("src/visualize.jl")
 
-N = 15
-tf = 1.4
-dt = tf/(N-1)
-
-n = 6
-m = 6
-g = @SVector [0, 0, -9.81] # gravity
-mu = .8                # friction constant
-mass = .2               # mass
-j = 1.                  # inertia
-f = 3.                  # max grasp force
-
-# rotational trajectory
-θdd = .01*ones(N)
-θd = [.01*t for t = 0:N-1]
-θ = [.005*t^2 for t = 0:N-1]
-
-# generate p v B matrices
-p1_0 = [.0,1, 0]; v1_0 = [.0,-1, 0]
-p2_0 = [.0,-1, 0]; v2_0 = [.0,1, 0]
-p1, v1, B1 = generate_pvB_3D(p1_0, v1_0, θ)
-p2, v2, B2 = generate_pvB_3D(p2_0, v2_0, θ)
-
-model = SquareObject(n, m, mu, mass, j, f, g, [p1, p2], [v1, v2], [B1, B2])
-
-x0 = @SVector [0.,1.,1.,0.,0.,0.]
-xf = @SVector zeros(n)
+ex = 2
+include("example$ex.jl")
 
 # indices for convenience
 pos_ind = 1:Int(n/2)
@@ -54,67 +29,68 @@ obj = LQRObjective(Q,R,Qf,xf,N);
 conSet = ConstraintList(n,m,N)
 
 # Goal Constraint
-goal = GoalConstraint(xf)
+goal = GoalConstraint(SVector{n}(xf))
 add_constraint!(conSet, goal, N)
 
 include("src/new_constraints.jl")
 for i = 1:N-1
     global model, u_ind, F1_ind, F2_ind, n, m
     local B, t_bal, A, max_f, A1, c1, nc1, A2, c2, nc2
+
     # Torque Balance
-    B = [model.B[1][i] model.B[2][i]]
+    B = [o.B[1][i] o.B[2][i]]
     t_bal = LinearConstraint(n, m, B, [θdd[i],0,0], Equality(), u_ind)
     add_constraint!(conSet, t_bal, i:i)
 
     # Max Grasp Force
     A = zeros(2, m)
-    A[1,1:Int(m/2)] = model.v[1][i]
-    A[2,1+Int(m/2):end] = model.v[2][i]
-    max_f = LinearConstraint(n, m, A, model.f*ones(2), Inequality(), u_ind)
+    A[1,1:Int(m/2)] = o.v[1][i]
+    A[2,1+Int(m/2):end] = o.v[2][i]
+    max_f = LinearConstraint(n, m, A, o.f*ones(2), Inequality(), u_ind)
     add_constraint!(conSet, max_f, i:i)
 
-    # SOCP friction Cone
-    v1_i = model.v[1][i]
+    # SOCP friction cone
+    v1_i = o.v[1][i]
     A1 = (I - v1_i*v1_i')
-    c1 = model.mu*v1_i
+    c1 = o.mu*v1_i
     nc1 = FrictionConstraint(n, m, A1, c1, TO.SecondOrderCone(), F1_ind)
     add_constraint!(conSet, nc1, i:i)
 
-    v2_i = model.v[2][i]
+    v2_i = o.v[2][i]
     A2 = (I - v2_i*v2_i')
-    c2 = model.mu*v2_i
+    c2 = o.mu*v2_i
     nc2 = FrictionConstraint(n, m, A2, c2, TO.SecondOrderCone(), F2_ind)
     add_constraint!(conSet, nc2, i:i)
 end
 
 # Problem
-prob = Problem(model, obj, xf, tf, x0=x0, constraints=conSet);
+prob = Problem(o, obj, xf, tf, x0=SVector{n}(x0), constraints=conSet);
 
-u0 = @SVector [0, 1, model.mass*9.81/2, 0, -1, model.mass*9.81/2]
+u0 = @SVector [0, -1.5, o.mass*9.81/2, 0, 1.5, o.mass*9.81/2]
 U0 = [u0 for k = 1:N-1]
 initial_controls!(prob, U0)
 rollout!(prob);
 
 using Altro
+# for example 2, solves in 50 ms
 opts = SolverOptions(
-    verbose = 0,
-    projected_newton_tolerance=4e-4,
-    cost_tolerance_intermediate=4e-3,
+    verbose = 1,
+    projected_newton_tolerance=1e-5,
+    cost_tolerance_intermediate=1e-5,
     penalty_scaling=10.,
     penalty_initial=1.0,
-    projected_newton=true
+    constraint_tolerance=1e-4
 )
 
 # normal solve
 altro = ALTROSolver(prob, opts)
 set_options!(altro, show_summary=true)
 solve!(altro)
-as = altro.stats
 
 # benchmark solve
 altro = ALTROSolver(prob, opts)
 set_options!(altro, show_summary=false)
-benchmark_solve!(altro)
+bm_altro = benchmark_solve!(altro)
 
 # extract results
 X = states(altro)
@@ -135,21 +111,26 @@ anim = Animation()
 for t = 1:N-1
     global F1, F2, y, z, model, θ
     local p, F
-    p = [model.p[1][t][2:3], model.p[2][t][2:3]]
+    p = [o.p[1][t][2:3], o.p[2][t][2:3]]
     F = [F1[t], F2[t]]
-    visualize_square([y[t],z[t]], θ[t], p, F, model.mass*model.g[2:3], r=1)
+    plot([])
+    visualize_square([y[t],z[t]], θ[t], p, F, o.mass*o.g[2:3], r=1)
     frame(anim)
 end
-gif(anim, string(@__DIR__,"/altro_3D_w_rotation.gif"), fps=2)
+gif(anim, string(@__DIR__,"/altro_3D_w_rotation$ex.gif"), fps=2)
 
 plot([x y z xd yd zd])
-png(string(@__DIR__,"/altro_3D_w_rotation.png"))
+png(string(@__DIR__,"/altro_3D_w_rotation$ex.png"))
 
-"""
-Solve Statistics
-  Total Iterations: 42
-  Solve Time: 208.64059899999998 (ms)
-"""
+plot([])
+for t = 1:2:N-1
+    global F1, F2, y, z, model, θ
+    local p, F
+    p = [o.p[1][t][2:3], o.p[2][t][2:3]]
+    F = [F1[t], F2[t]]
+    visualize_square([y[t],z[t]], θ[t], p, F, o.mass*o.g[2:3], fa=t/(N-1))
+end
+plot!([])
 
 # # verify in friction cone
 # for i = 1:N-1
@@ -176,7 +157,7 @@ Solve Statistics
 #     global U
 #     local A
 #     A = zeros(2, m)
-#     A[1,1:Int(m/2)] = model.v[1][i]
-#     A[2,1+Int(m/2):end] = model.v[2][i]
+#     A[1,1:Int(m/2)] = o.v[1][i]
+#     A[2,1+Int(m/2):end] = o.v[2][i]
 #     @show A*U[i]
 # end
