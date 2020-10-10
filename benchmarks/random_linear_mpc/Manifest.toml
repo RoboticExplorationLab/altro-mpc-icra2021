@@ -8,7 +8,9 @@ version = "2.1.0"
 
 [[Altro]]
 deps = ["BenchmarkTools", "Crayons", "DocStringExtensions", "Interpolations", "LinearAlgebra", "Logging", "Parameters", "RobotDynamics", "RobotZoo", "Rotations", "SolverLogging", "SparseArrays", "StaticArrays", "Statistics", "TrajectoryOptimization", "UnsafeArrays"]
-git-tree-sha1 = "c33b970aa12d5d437bf8010a1d096f0edcd91a5d"
+git-tree-sha1 = "f3405dad88b12c46b763206208636e64e82f6cc2"
+repo-rev = "socp"
+repo-url = "https://github.com/RoboticExplorationLab/Altro.jl.git"
 uuid = "5dcf52e5-e2fb-48e0-b826-96f46d2e3e73"
 version = "0.2.0"
 
@@ -592,7 +594,9 @@ uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[TrajectoryOptimization]]
 deps = ["DocStringExtensions", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "RobotDynamics", "SparseArrays", "StaticArrays", "UnsafeArrays"]
-git-tree-sha1 = "5185316993287b4ead4715d8fa62aee5cc92ba91"
+git-tree-sha1 = "602a8cf7762ec65d2ca3b56b5837927c061cbab2"
+repo-rev = "socp"
+repo-url = "https://github.com/RoboticExplorationLab/TrajectoryOptimization.jl.git"
 uuid = "c79d492b-0548-5874-b488-5a62c1d9d0ca"
 version = "0.3.2"
 
