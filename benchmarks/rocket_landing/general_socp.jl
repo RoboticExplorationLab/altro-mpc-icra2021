@@ -1,4 +1,4 @@
-struct NormConstraint2{S,D,p,q} <: TrajectoryOptimization.StageConstraint #TrajectoryOptimization.ControlConstraint
+struct NormConstraint2{S,D,p,q} <: TrajectoryOptimization.StageConstraint 
     n::Int
     m::Int
     A::SizedMatrix{p, q, Float64, 2}
@@ -6,10 +6,8 @@ struct NormConstraint2{S,D,p,q} <: TrajectoryOptimization.StageConstraint #Traje
     sense::S
     inds::SVector{D,Int}
     function NormConstraint2(n::Int, m::Int, A::SizedMatrix, c::SVector, sense::TrajectoryOptimization.ConstraintSense,
-            inds = SVector{n+m}(1:n+m))
-        if inds == :state
-            inds = SVector{n}(1:n)
-        elseif inds == :control
+            inds = SVector{m}(1:m))
+        if inds == :control
             inds = SVector{m}(n .+ (1:m))
         end
         @assert size(A,2) == length(c)
@@ -32,8 +30,6 @@ end
 
 function TrajectoryOptimization.jacobian!(∇c, con::NormConstraint2{TrajectoryOptimization.SecondOrderCone}, 
                                                     z::AbstractKnotPoint)
-#     display(con)
-#     display(con.inds)
     ∇c[1:length(con.inds),con.inds] = con.A
     ∇c[1+length(con.inds),con.inds] = con.c
     return true
