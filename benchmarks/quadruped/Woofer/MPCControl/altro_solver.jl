@@ -154,10 +154,7 @@ function foot_forces!(
 
     initial_states!(opt.problem, opt.X0)
     initial_controls!(opt.problem, opt.U0)
-    @time solve!(opt.solver)
-
-    # allocs = @allocated(solve!(opt.solver))
-    # println("Allocations: ", allocs)
+    b = @benchmark solve!($(opt.solver)) samples=1 evals=1
 
     opt.X0 .= states(opt.solver)
     opt.U0 .= controls(opt.solver)
@@ -166,14 +163,9 @@ function foot_forces!(
         @warn "Solver status: $(opt.solver.stats.status)"
     end
 
-    rot = MRP(x_curr[4], x_curr[5], x_curr[6])
+    param.forces = opt.U0[1]
 
-    inertial_forces = opt.U0[1]
+    # return b
 
-    param.forces = inertial_forces
-
-    # param.forces = [rot \ inertial_forces[SLegIndexToRange(1)];
-    #                 rot \ inertial_forces[SLegIndexToRange(2)];
-    #                 rot \ inertial_forces[SLegIndexToRange(3)];
-    #                 rot \ inertial_forces[SLegIndexToRange(4)]]
+    return (opt.X0, opt.U0)
 end

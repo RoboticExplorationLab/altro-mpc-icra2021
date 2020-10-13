@@ -76,11 +76,92 @@ function reference_trajectory!(
     x_curr::AbstractVector{T},
     param::ControllerParams,
 ) where {T<:Number}
-    α = collect(range(0, 1, length = param.N + 1))
+    # integrate the x,y position from the reference
 
-    for i = 1:param.N+1
-        param.x_ref[i] = (1 - α[i]) * x_curr + α[i] * param.x_des
+    # interp_length = Int(round(param.N/3))
+    interp_length = 2
+    α = [collect(range(0, 1, length = interp_length)); ones(param.N - interp_length)]
+
+    # for i = 1:param.N+1
+    #     param.x_ref[i] = (1 - α[i]) * x_curr + α[i] * param.x_des
+    # end
+
+    p_integrate = x_curr[SUnitRange(1,2)]
+    v_i = param.x_des[SUnitRange(7,8)]
+
+    for i=1:param.N
+        if param.vel_ctrl
+			p_integrate += v_i*param.optimizer.dt
+
+			param.x_ref[i] = [p_integrate; ((1 - α[i]) * x_curr + α[i] * param.x_des)[SUnitRange(3, 12)]]
+        else
+            param.x_ref[i] = ((1 - α[i]) * x_curr + α[i] * param.x_des)
+        end
     end
+end
+
+const n = 12
+const m = 12
+
+function update_osqp_model!(param::ControllerParams, x_curr)
+    opt = param.optimizer
+    N = param.N
+
+    x_end = n*(N-1)
+
+    for i = 1:(N-1)
+        A_c_i = LinearizedContinuousDynamicsA(
+            param.x_ref[i],
+            opt.u_ref[i],
+            param.foot_locs[i],
+            param.contacts[i],
+            opt.J,
+            opt.sprung_mass,
+        )
+        B_c_i = LinearizedContinuousDynamicsB(
+            param.x_ref[i],
+            opt.u_ref[i],
+            param.foot_locs[i],
+            param.contacts[i],
+            opt.J,
+            opt.sprung_mass,
+        )
+        d_c_i = - A_c_i*param.x_ref[i] - B_c_i*opt.u_ref[i] + NonLinearContinuousDynamics(
+            param.x_ref[i],
+            opt.u_ref[i],
+            param.foot_locs[i],
+            param.contacts[i],
+            opt.J,
+            opt.sprung_mass,
+        ) 
+
+        opt.A_vec[i] = oneunit(SMatrix{12,12}) + A_c_i * opt.dt + A_c_i^2 * opt.dt^2/2
+        opt.B_vec[i] = B_c_i * opt.dt + A_c_i*B_c_i*opt.dt^2/2
+        opt.d_vec[i] = d_c_i * opt.dt + A_c_i*d_c_i*opt.dt^2/2
+
+        if i==1
+            opt.A_osqp[select(1,n), x_end .+ select(1,m)] = opt.B_vec[i]
+            opt.A_osqp[select(1,n), select(1,n)] = -I(n)
+            opt.l[select(1,n)] = -opt.d_vec[i] - opt.A_vec[i]*x_curr
+            opt.u[select(1,n)] = -opt.d_vec[i] - opt.A_vec[i]*x_curr
+        else
+            opt.A_osqp[select(i,n), select(i-1,n)] = opt.A_vec[i]
+            opt.A_osqp[select(i,n), x_end .+ select(i,m)] = opt.B_vec[i]
+            opt.A_osqp[select(i,n), select(i,n)] = -I(n)
+            opt.l[select(i,n)] = -opt.d_vec[i]
+            opt.u[select(i,n)] = -opt.d_vec[i]
+
+            # x_ref:
+            opt.x_ref_osqp[select(i-1,n)] = param.x_ref[i]
+
+            # u_ref:
+            opt.x_ref_osqp[x_end .+ select(i,m)] = opt.u_ref[i]
+        end
+    end
+
+    opt.q_osqp .= -opt.P_osqp*opt.x_ref_osqp
+
+    OSQP.update!(opt.model, q=opt.q_osqp, Ax=opt.A_osqp.nzval, l=opt.l, u=opt.u)
 end
 
 function foot_forces!(
@@ -92,40 +173,24 @@ function foot_forces!(
     # contacts: 4xN+1 matrix of foot contacts over the planning horizon
     # foot_locs: 12xN+1 matrix of foot location in body frame over planning horizon
 
-    opt = param.optimizer
-    N = opt.N
-    dt = opt.dt
+    N = param.N
 
-    for i = 1:N
-        opt.x_ref[i][] = param.x_ref[i]
+    As = [@SMatrix zeros(n,n) for i=1:(N-1)]
+    Bs = [@SMatrix zeros(n,m) for i=1:(N-1)]
+    ds = [@SVector zeros(n) for i=1:(N-1)]
 
-        A_c_i = LinearizedContinuousDynamicsA(opt.x_ref[i][], opt.u_ref[i][], param.foot_locs[i], param.contacts[i], opt.J, opt.sprung_mass)
-		B_c_i = LinearizedContinuousDynamicsB(opt.x_ref[i][], opt.u_ref[i][], param.foot_locs[i], param.contacts[i], opt.J, opt.sprung_mass)
-		d_c_i = NonLinearContinuousDynamics(opt.x_ref[i][], opt.u_ref[i][], param.foot_locs[i], param.contacts[i], opt.J, opt.sprung_mass)
+    update_osqp_model!(param, x_curr)
+    # b = @benchmark $results = OSQP.solve!($(param.optimizer.model)) samples=1 evals=1
+    results = OSQP.solve!(param.optimizer.model) 
+    param.forces = results.x[n*(N-1) .+ select12(1)]
 
-		# Euler Discretization
-		opt.A_d[i][] = oneunit(SMatrix{12,12,T}) + A_c_i*dt
-		opt.B_d[i][] = B_c_i*dt
-		opt.d_d[i][] = d_c_i*dt + opt.x_ref[i][]
+    xs = [i==1 ? x_curr : results.x[select(i-1, n)] for i=1:(N)]
+    us = [results.x[n*(N-1) .+ select(i, m)] for i=1:(N-1)]
 
-		opt.q[i][] = 2*opt.Q_i*opt.x_ref[i][]
-		opt.r[i][] = 2*opt.R_i*opt.u_ref[i][]
-    end
-    opt.x_ref[N+1][] = param.x_ref[N+1]
-	opt.q[N+1][] = 2*opt.Q_f*opt.x_ref[N+1][]
+    @show param.forces
+    @show results.info.run_time
 
-    allocs = @allocated(solve!(opt.model))
-
-    # println("Allocations: ", allocs)
-    
-    rot = MRP(x_curr[4], x_curr[5], x_curr[6])
-
-    forces_inertial = value.(opt.model, opt.u)[select12(1)]
-
-    param.forces = [rot \ forces_inertial[SLegIndexToRange(1)];
-                    rot \ forces_inertial[SLegIndexToRange(2)];
-                    rot \ forces_inertial[SLegIndexToRange(3)];
-                    rot \ forces_inertial[SLegIndexToRange(4)]]
+    return (xs, us)
 end
 
 function select12(i)

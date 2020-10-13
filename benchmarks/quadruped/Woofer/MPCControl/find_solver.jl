@@ -22,9 +22,8 @@ if data["solver"] == "ALTRO"
 
 else
 	const using_altro = false
-
-	using Parametron
 	using OSQP
+	using SparseArrays
 
 	include("Structs/FootstepLocation.jl")
 	include("Structs/QPParams.jl")

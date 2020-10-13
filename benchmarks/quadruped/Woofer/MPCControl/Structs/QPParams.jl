@@ -1,175 +1,149 @@
-struct OptimizerParams{T,S}
-    # discretization length
+struct OptimizerParams{T,S,M}
     dt::T
-
-    # planning horizon length
     N::S
 
-    # Parametron Variables:
-    model::Model
-    x::Vector{Variable}
-    u::Vector{Variable}
+    model::M
+    x_ref_osqp::Vector{T}
+    P_osqp::SparseMatrixCSC{T,S}
+    q_osqp::Vector{T}
+    A_osqp::SparseMatrixCSC{T,S}
+    l::Vector{T}
+    u::Vector{T}
 
-    Q_f::Diagonal
-    Q_i::Diagonal
-    R_i::Diagonal
+    # Store dynamics matrices:
+    A_vec::Vector{SMatrix{12,12,T,144}}
+    B_vec::Vector{SMatrix{12,12,T,144}}
+    d_vec::Vector{SVector{12,T}}
 
-    # Parameter References
-    x_ref::Vector{Base.RefValue{SVector{12,T}}}
-    u_ref::Vector{Base.RefValue{SVector{12,T}}}
-
-    A_d::Vector{Base.RefValue{SMatrix{12,12,T,144}}}
-    B_d::Vector{Base.RefValue{SMatrix{12,12,T,144}}}
-    d_d::Vector{Base.RefValue{SVector{12,T}}}
-
-    q::Vector{Base.RefValue{SVector{12,T}}}
-    r::Vector{Base.RefValue{SVector{12,T}}}
-
+    u_ref::Vector{SVector{12, T}}
     J::SMatrix{3,3,T,9}
     sprung_mass::T
+end
 
-    function OptimizerParams(
-        dt::T,
-        N::S,
-        q::AbstractVector{T},
-        r::AbstractVector{T},
-        μ,
-        min_vert_force,
-        max_vert_force;
-        n::Integer = 12,
-        m::Integer = 12,
-    ) where {T<:Number,S<:Integer}
-        # initialize model and variables
-        model = Model(OSQP.Optimizer(verbose = false))
-        x = [Variable(model) for _ = 1:((N+1)*n)]
-        u = [Variable(model) for _ = 1:((N)*n)]
+select(i, n) = (n*(i-1)+1):(n*(i-1)+n)
+selectn_l(i, j, k, n=12, l=3) = n*(i-1) + l*(j-1) + k
 
-        # initialize quadratic cost parameters
-        Q_f = Diagonal(SVector{n}(q))
-        Q_i = Diagonal(SVector{n}(q))
-        R_i = Diagonal(SVector{m}(r))
+function OptimizerParams(
+    dt::T,
+    N::S,
+    q::AbstractVector{T},
+    r::AbstractVector{T},
+    μ,
+    min_vert_force,
+    max_vert_force;
+    n::Integer = 12,
+    m::Integer = 12,
+    tol = 1e-6
+) where {T<:Number,S<:Integer}
+    # initialize model and variables
+    model = OSQP.Model()    
+    # initialize quadratic cost parameters
+    p = [repeat(q, N-1); repeat(r, N-1)]
+    P_osqp = Diagonal(p)
 
-        x_ref_param =
-            [Parameter(model, val = zero(SVector{12,T})) for _ = 1:(N+1)]
-        u_ref_param =
-            [Parameter(model, val = zero(SVector{12,T})) for _ = 1:(N)]
+    # x = [x(2), ..., x(N), u(1), ..., u(N-1)]
+    osqp_dim = (m+n)*(N-1)
+    x_ref_osqp = zeros(osqp_dim)
+    u_ref = [zeros(m) for i=1:(N-1)]
 
-        A_d_param =
-            [Parameter(model, val = zero(SMatrix{12,12,T})) for _ = 1:(N)]
-        B_d_param =
-            [Parameter(model, val = zero(SMatrix{12,12,T})) for _ = 1:(N)]
-        d_d_param = [Parameter(model, val = zero(SVector{12,T})) for _ = 1:(N)]
+    q_osqp = P_osqp*x_ref_osqp
 
-        q_param = [Parameter(model, val = zero(SVector{12,T})) for _ = 1:(N+1)]
-        r_param = [Parameter(model, val = zero(SVector{12,T})) for _ = 1:(N)]
+    # (N-1)*12 Dynamics Constraints
+    # (N-1)*20 Friction/Control Constraints
+    constraint_dim = n*(N-1) + (N-1)*20
+    l = zeros(constraint_dim)
+    u = zeros(constraint_dim)
+    C = zeros(constraint_dim, osqp_dim)
 
-        # terminal state cost
-        objective = @expression transpose(x[select12(N + 1)]) *
-                    Q_f *
-                    (x[select12(N + 1)]) -
-                    transpose(q_param[N+1]) * x[select12(N + 1)]
+    A_ones = ones(n,n)
+    B_ones = ones(n,m)
+    d_ones = ones(n)
 
-        println("Objective constraint allocations: ")
-        Parametron.findallocs(objective)
+    x_end = n*(N-1)
 
-        for i = 1:N
-            # stagewise state penalty
-
-            objective = @expression objective +
-                        transpose(x[select12(i)]) * Q_i * (x[select12(i)]) -
-                        transpose(q_param[i]) * x[select12(i)]
-
-            #stagewise control penalty
-            objective = @expression objective +
-                        transpose(u[select12(i)]) * R_i * (u[select12(i)]) -
-                        transpose(r_param[i]) * u[select12(i)]
-        end
-
-        @objective(model, Minimize, objective)
-
-        # Dynamics constraint:
-        @constraint(model, x[select12(1)] == x_ref_param[1])
-        for i = 1:(N)
-            @constraint(
-                model,
-                x[select12(i + 1)] ==
-                A_d_param[i] * (x[select12(i)] - x_ref_param[i]) +
-                B_d_param[i] * (u[select12(i)] - u_ref_param[i]) +
-                d_d_param[i]
-            )
-        end
-
-        dynamics_exp = @expression x[select12(1 + 1)] ==
-                    A_d_param[1] * (x[select12(1)] - x_ref_param[1]) +
-                    B_d_param[1] * (u[select12(1)] - u_ref_param[1]) +
-                    d_d_param[1]
-
-        println("Dynamics Constraint allocations: ")
-        Parametron.findallocs(dynamics_exp)
-
-        # Control Constraints
-        for i = 1:N
-            # Control constraints
-            for j = 1:4
-                # convert absolute value constraint to linear inequality:
-                @constraint(
-                    model,
-                    u[select12_3(i, j, 1)] <= μ * u[select12_3(i, j, 3)]
-                )
-                @constraint(
-                    model,
-                    u[select12_3(i, j, 1)] >= -μ * u[select12_3(i, j, 3)]
-                )
-                @constraint(
-                    model,
-                    u[select12_3(i, j, 2)] <= μ * u[select12_3(i, j, 3)]
-                )
-                @constraint(
-                    model,
-                    u[select12_3(i, j, 2)] >= -μ * u[select12_3(i, j, 3)]
-                )
-
-                @constraint(model, u[select12_3(i, j, 3)] >= min_vert_force)
-                @constraint(model, u[select12_3(i, j, 3)] <= max_vert_force)
-            end
-        end
-
-        println("Control Constraint allocations: ")
-        control_constraint =
-            @expression u[select12_3(1, 1, 2)] + μ * u[select12_3(1, 1, 3)]
-        Parametron.findallocs(control_constraint)
-
-        ref_arr_x = [x_ref_param[i].val for i = 1:(N+1)]
-        ref_arr_u = [u_ref_param[i].val for i = 1:(N)]
-
-        ref_arr_A_d = [A_d_param[i].val for i = 1:(N)]
-        ref_arr_B_d = [B_d_param[i].val for i = 1:(N)]
-        ref_arr_d_d = [d_d_param[i].val for i = 1:(N)]
-
-        ref_arr_q = [q_param[i].val for i = 1:(N+1)]
-        ref_arr_r = [r_param[i].val for i = 1:(N)]
-
-        J = woofer.inertial.body_inertia
-        sprung_mass = woofer.inertial.sprung_mass
-
-        new{T,S}(
-            dt,
-            N,
-            model,
-            x,
-            u,
-            Q_f,
-            Q_i,
-            R_i,
-            ref_arr_x,
-            ref_arr_u,
-            ref_arr_A_d,
-            ref_arr_B_d,
-            ref_arr_d_d,
-            ref_arr_q,
-            ref_arr_r,
-            J,
-            sprung_mass
-        )
+    # Dynamics Constraints
+    C[select(1,n), x_end .+ select(1,m)] = B_ones 
+    C[select(1,n), select(1,n)] = -I(n)
+    l[select(1,n)] = -d_ones - A_ones*ones(n)
+    u[select(1,n)] = -d_ones - A_ones*ones(n)
+    for i=2:N-1
+        C[select(i,n), select(i-1,n)] = A_ones
+        C[select(i,n), x_end .+ select(i,m)] = B_ones 
+        C[select(i,n), select(i,n)] = -I(n)
+        l[select(i,n)] = -d_ones
+        u[select(i,n)] = -d_ones
     end
+
+    ∞ = 5e2
+  
+    # Control Constraints
+    dyn_end = n*(N-1)
+    for i=1:N-1
+        # loop over each foot
+        for j=1:4
+            # |f_x| ≤ μf_z
+            # -μf_z ≤ f_x ≤ μf_z
+            # -∞ ≤ f_x - μf_z ≤ 0
+            C[dyn_end .+ selectn_l(i, j, 1, 20, 5), x_end .+ selectn_l(i, j, 1)] = 1
+            C[dyn_end .+ selectn_l(i, j, 1, 20, 5), x_end .+ selectn_l(i, j, 3)] = -μ
+            l[dyn_end .+ selectn_l(i, j, 1, 20, 5)] = -∞
+            u[dyn_end .+ selectn_l(i, j, 1, 20, 5)] = 0
+            # 0 ≤ f_x + μf_z ≤ ∞
+            C[dyn_end .+ selectn_l(i, j, 2, 20, 5), x_end .+ selectn_l(i, j, 1)] = 1
+            C[dyn_end .+ selectn_l(i, j, 2, 20, 5), x_end .+ selectn_l(i, j, 3)] = μ
+            l[dyn_end .+ selectn_l(i, j, 2, 20, 5)] = 0
+            u[dyn_end .+ selectn_l(i, j, 2, 20, 5)] = ∞
+            
+            # |f_y| ≤ μf_z
+            # -μf_z ≤ f_y ≤ μf_z
+            # -∞ ≤ f_y - μf_z ≤ 0
+            C[dyn_end .+ selectn_l(i, j, 3, 20, 5), x_end .+ selectn_l(i, j, 2)] = 1
+            C[dyn_end .+ selectn_l(i, j, 3, 20, 5), x_end .+ selectn_l(i, j, 3)] = -μ
+            l[dyn_end .+ selectn_l(i, j, 3, 20, 5)] = -∞
+            u[dyn_end .+ selectn_l(i, j, 3, 20, 5)] = 0
+            # 0 ≤ f_y + μf_z ≤ ∞
+            C[dyn_end .+ selectn_l(i, j, 4, 20, 5), x_end .+ selectn_l(i, j, 2)] = 1
+            C[dyn_end .+ selectn_l(i, j, 4, 20, 5), x_end .+ selectn_l(i, j, 3)] = μ
+            l[dyn_end .+ selectn_l(i, j, 4, 20, 5)] = 0
+            u[dyn_end .+ selectn_l(i, j, 4, 20, 5)] = ∞
+            
+            # min_vert_force ≤ f_z ≤ max_vert_force
+            C[dyn_end .+ selectn_l(i, j, 5, 20, 5), x_end .+ selectn_l(i, j, 3)] = 1
+            l[dyn_end .+ selectn_l(i, j, 5, 20, 5)] = min_vert_force
+            u[dyn_end .+ selectn_l(i, j, 5, 20, 5)] = max_vert_force
+        end
+    end
+
+    A_osqp = sparse(C)
+    P_osqp = sparse(P_osqp)
+
+    OSQP.setup!(model, P=P_osqp, q=q_osqp, A=A_osqp, l=l, u=u)
+    OSQP.update_settings!(model, eps_abs = tol, eps_rel = tol, eps_prim_inf = tol, eps_dual_inf = tol)
+
+    J = woofer.inertial.body_inertia
+    sprung_mass = woofer.inertial.sprung_mass
+
+    M = typeof(model)
+
+    A_vec = [@SMatrix zeros(n,n) for i=1:(N-1)]
+    B_vec = [@SMatrix zeros(n,m) for i=1:(N-1)]
+    d_vec = [@SVector zeros(n) for i=1:(N-1)]
+
+    return OptimizerParams{T,S,M}(
+        dt,
+        N,
+        model,
+        x_ref_osqp,
+        P_osqp,
+        q_osqp,
+        A_osqp,
+        l,
+        u,
+        A_vec,
+        B_vec,
+        d_vec,
+        u_ref,
+        J,
+        sprung_mass
+    )
 end
