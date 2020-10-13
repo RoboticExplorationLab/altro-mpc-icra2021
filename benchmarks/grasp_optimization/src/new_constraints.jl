@@ -38,26 +38,14 @@ end
 @inline state_dim(con::NormConstraint2) = con.n
 @inline control_dim(con::NormConstraint2) = con.m
 @inline TO.sense(con::NormConstraint2) = con.sense
-# @inline Base.length(::NormConstraint2) = 1
-@inline Base.length(::NormConstraint2{SecondOrderCone,D}) where D = D + 1
+@inline Base.length(::NormConstraint2{TO.SecondOrderCone,D}) where D = D + 1
 
-# function TO.evaluate(con::NormConstraint2, z::AbstractKnotPoint)
-# 	x = z.z[con.inds]
-# 	return @SVector [x'x - con.val*con.val]
-# end
-
-function TO.evaluate(con::NormConstraint2{SecondOrderCone}, z::AbstractKnotPoint)
+function TO.evaluate(con::NormConstraint2{TO.SecondOrderCone}, z::AbstractKnotPoint)
 	v = con.A*z.z[con.inds]
 	return push(v, con.c'*z.z[con.inds])
 end
 
-# function TO.jacobian!(∇c, con::NormConstraint2, z::AbstractKnotPoint)
-# 	x = z.z[con.inds]
-# 	∇c[1,con.inds] .= 2*x
-# 	return false
-# end
-
-function TO.jacobian!(∇c, con::NormConstraint2{SecondOrderCone}, z::AbstractKnotPoint)
+function TO.jacobian!(∇c, con::NormConstraint2{TO.SecondOrderCone}, z::AbstractKnotPoint)
 	∇c[1:length(con.inds),con.inds] = con.A
 	∇c[1+length(con.inds),con.inds] = con.c
 	return true

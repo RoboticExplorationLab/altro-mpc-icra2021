@@ -1,10 +1,10 @@
-using LinearAlgebra
-using Convex
-using ECOS
-using Plots
+using Pkg
+Pkg.activate(@__DIR__)
+Pkg.instantiate()
+
+using StaticArrays, LinearAlgebra, Plots, BenchmarkTools
 using RobotDynamics
-using StaticArrays
-using BenchmarkTools
+using Convex, ECOS
 
 include("src/visualize.jl")
 include("src/grasp_model.jl")
@@ -70,9 +70,7 @@ for t = 1:N-1
 end
 gif(anim, string(@__DIR__, "/ecos_3D_w_rotation$ex.gif"), fps=2)
 
-plot(Z.value')
-png(string(@__DIR__, "/ecos_3D_w_rotation$ex.png"))
-
+# static version of gif
 plot([])
 for t = 1:3:N-1
     local p, F
@@ -81,3 +79,29 @@ for t = 1:3:N-1
     visualize_square(Z.value[2:3,t], θ[t], p, F, o.mass*o.g[2:3], r=1, xlims=(-3,7), ylims=(-4,4.5), fa=t/(N-1))
 end
 plot!([])
+
+# plot of state vector trajectory
+plot(Z.value',
+    xlabel="Time Step",
+    ylabel="Coordinate",
+    label = ["x" "y" "z" "xd" "yd" "zd"])
+
+# plot of normal forces
+normal1 = [dot(o.v[1][i], F1.value[:,i]) for i = 1:N-1]
+normal2 = [dot(o.v[2][i], F2.value[:,i]) for i = 1:N-1]
+plot([normal1 normal2 o.f*ones(N-1)],
+    xlabel="Time Step",
+    ylabel="Normal Force",
+    linestyle = [:solid :solid :dash],
+    label = ["F_N1" "F_N1" "Max Grasping Force"])
+
+# plot of tangential to normal force ratio
+tangent1 = [norm((I - o.v[1][i]*o.v[1][i]')*F1.value[:,i]) for i = 1:N-1]
+tangent2 = [norm((I - o.v[2][i]*o.v[2][i]')*F2.value[:,i]) for i = 1:N-1]
+friction1 = tangent1 ./ normal1
+friction2 = tangent2 ./ normal2
+plot([friction1 friction2 o.mu*ones(N-1)],
+    xlabel="Time Step",
+    ylabel="Tangential Force/Normal Force",
+    linestyle = [:solid :solid :dash],
+    label = ["F_T1/F_N1" "F_T2/F_N2" "mu"])

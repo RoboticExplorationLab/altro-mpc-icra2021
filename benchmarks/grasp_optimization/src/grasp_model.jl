@@ -31,3 +31,8 @@ end
 
 RobotDynamics.state_dim(o::SquareObject) = o.n
 RobotDynamics.control_dim(o::SquareObject) = o.m
+
+function noisy_discrete_dynamics(model::SquareObject, x, u, dt; noise_level=.05)
+    z = KnotPoint(x, u, dt)
+    return discrete_dynamics(model, z) + noise_level*randn(model.n)
+end

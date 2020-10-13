@@ -1,4 +1,7 @@
-import Pkg; Pkg.activate(string(@__DIR__,"/..")); Pkg.instantiate();
+using Pkg
+Pkg.activate(@__DIR__)
+Pkg.instantiate()
+
 using TrajectoryOptimization
 const TO = TrajectoryOptimization
 using StaticArrays, LinearAlgebra
@@ -30,7 +33,7 @@ conSet = ConstraintList(n,m,N)
 
 # Goal Constraint
 goal = GoalConstraint(SVector{n}(xf))
-add_constraint!(conSet, goal, N)
+TO.add_constraint!(conSet, goal, N)
 
 include("src/new_constraints.jl")
 for i = 1:N-1
@@ -40,31 +43,31 @@ for i = 1:N-1
     # Torque Balance
     B = [o.B[1][i] o.B[2][i]]
     t_bal = LinearConstraint(n, m, B, [θdd[i],0,0], Equality(), u_ind)
-    add_constraint!(conSet, t_bal, i:i)
+    TO.add_constraint!(conSet, t_bal, i:i)
 
     # Max Grasp Force
     A = zeros(2, m)
     A[1,1:Int(m/2)] = o.v[1][i]
     A[2,1+Int(m/2):end] = o.v[2][i]
     max_f = LinearConstraint(n, m, A, o.f*ones(2), Inequality(), u_ind)
-    add_constraint!(conSet, max_f, i:i)
+    TO.add_constraint!(conSet, max_f, i:i)
 
     # SOCP friction cone
     v1_i = o.v[1][i]
     A1 = (I - v1_i*v1_i')
     c1 = o.mu*v1_i
     nc1 = FrictionConstraint(n, m, A1, c1, TO.SecondOrderCone(), F1_ind)
-    add_constraint!(conSet, nc1, i:i)
+    TO.add_constraint!(conSet, nc1, i:i)
 
     v2_i = o.v[2][i]
     A2 = (I - v2_i*v2_i')
     c2 = o.mu*v2_i
     nc2 = FrictionConstraint(n, m, A2, c2, TO.SecondOrderCone(), F2_ind)
-    add_constraint!(conSet, nc2, i:i)
+    TO.add_constraint!(conSet, nc2, i:i)
 end
 
 # Problem
-prob = Problem(o, obj, xf, tf, x0=SVector{n}(x0), constraints=conSet);
+prob = TO.Problem(o, obj, xf, tf, x0=SVector{n}(x0), constraints=conSet);
 
 u0 = @SVector [0, -1.5, o.mass*9.81/2, 0, 1.5, o.mass*9.81/2]
 U0 = [u0 for k = 1:N-1]
@@ -85,12 +88,12 @@ opts = SolverOptions(
 # normal solve
 altro = ALTROSolver(prob, opts)
 set_options!(altro, show_summary=true)
-solve!(altro)
+Altro.solve!(altro)
 
-# benchmark solve
-altro = ALTROSolver(prob, opts)
-set_options!(altro, show_summary=false)
-bm_altro = benchmark_solve!(altro)
+# # benchmark solve
+# altro = ALTROSolver(prob, opts)
+# set_options!(altro, show_summary=false)
+# bm_altro = benchmark.solve!(altro)
 
 # extract results
 X = states(altro)
@@ -106,7 +109,7 @@ zd = [X[t][6] for t = 1:N]
 F1 = [U[t][2:3] for t = 1:N-1]
 F2 = [U[t][5:6] for t = 1:N-1]
 
-# visualize
+# gif of trajectory
 anim = Animation()
 for t = 1:N-1
     global F1, F2, y, z, model, θ
@@ -119,9 +122,7 @@ for t = 1:N-1
 end
 gif(anim, string(@__DIR__,"/altro_3D_w_rotation$ex.gif"), fps=2)
 
-plot([x y z xd yd zd])
-png(string(@__DIR__,"/altro_3D_w_rotation$ex.png"))
-
+# static version of gif
 plot([])
 for t = 1:2:N-1
     global F1, F2, y, z, model, θ
@@ -130,34 +131,30 @@ for t = 1:2:N-1
     F = [F1[t], F2[t]]
     visualize_square([y[t],z[t]], θ[t], p, F, o.mass*o.g[2:3], fa=t/(N-1))
 end
-plot!([])
+title!("Gravity in green, Gripper forces in red")
 
-# # verify in friction cone
-# for i = 1:N-1
-#     global X, U, dt, nc1
-#     local t, z1, x1
-#     t=1
-#     z1 = KnotPoint(X[t], U[t], dt)
-#     x1 = TO.evaluate(nc1, z1)
-#     @show x1
-# end
-#
-# for i = 1:N-1
-#     global X, U, dt, nc2
-#     local t, z1, x1
-#     t=1
-#     z1 = KnotPoint(X[t], U[t], dt)
-#     x1 = TO.evaluate(nc2, z1)
-#     @show x1
-# end
-#
-#
-# # verify max grasp force
-# for i = 1:N-1
-#     global U
-#     local A
-#     A = zeros(2, m)
-#     A[1,1:Int(m/2)] = o.v[1][i]
-#     A[2,1+Int(m/2):end] = o.v[2][i]
-#     @show A*U[i]
-# end
+# plot of state vector trajectory
+plot([x y z xd yd zd],
+    xlabel="Time Step",
+    ylabel="Coordinate",
+    label = ["x" "y" "z" "xd" "yd" "zd"])
+
+# plot of normal forces
+normal1 = [dot(o.v[1][i], U[i][1:3]) for i = 1:N-1]
+normal2 = [dot(o.v[2][i], U[i][4:6]) for i = 1:N-1]
+plot([normal1 normal2 o.f*ones(N-1)],
+    xlabel="Time Step",
+    ylabel="Normal Force",
+    linestyle = [:solid :solid :dash],
+    label = ["F_N1" "F_N1" "Max Grasping Force"])
+
+# plot of tangential to normal force ratio
+tangent1 = [norm((I - o.v[1][i]*o.v[1][i]')*U[i][1:3]) for i = 1:N-1]
+tangent2 = [norm((I - o.v[2][i]*o.v[2][i]')*U[i][4:6]) for i = 1:N-1]
+friction1 = tangent1 ./ normal1
+friction2 = tangent2 ./ normal2
+plot([friction1 friction2 o.mu*ones(N-1)],
+    xlabel="Time Step",
+    ylabel="Tangential Force/Normal Force",
+    linestyle = [:solid :solid :dash],
+    label = ["F_T1/F_N1" "F_T2/F_N2" "mu"])

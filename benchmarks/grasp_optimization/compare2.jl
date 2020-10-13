@@ -10,8 +10,8 @@ using Convex, ECOS
 include("src/grasp_model.jl")
 include("src/visualize.jl")
 
-ex = 2
-include("example$ex.jl")
+ex = 2 # pick an example
+include("example$ex.jl") # create model and set x0 and xf
 
 ## ALTRO
 # indices for convenience
@@ -169,18 +169,18 @@ histogram(bm_altro.times/1e6,fillalpha=.5,label="ALTRO")
 histogram!(bm_ecos.times/1e6,fillalpha=.5,label="ECOS")
 histogram!(bm_altro_warm.times/1e6,fillalpha=.5,label="ALTRO w warm start")
 histogram!(bm_ecos_warm.times/1e6,fillalpha=.5,label="ECOS w warm start")
-#
-# # controls
-# Fz_altro = [U_altro[t][3] for t = 1:N-1]
-# Fz_ecos = F1.value[3,:]
-# plot([Fz_altro Fz_ecos], label=["ALTRO" "ECOS"])
-#
-# # trajectory
-# plot([])
-# for t = 1:3:N-1
-#     local p, F
-#     p = [o.p[1][t][2:3], o.p[2][t][2:3]]
-#     F = [F1.value[2:3, t], F2.value[2:3, t]]
-#     visualize_square(Z.value[2:3,t], θ[t], p, F, o.mass*o.g[2:3], r=1, xlims=(-3,7), ylims=(-4,4.5), fa=t/(N-1))
-# end
-# plot!([])
+
+# controls
+Fz_altro = [U_altro[t][3] for t = 1:N-1]
+Fz_ecos = F1.value[3,:]
+plot([Fz_altro Fz_ecos], label=["ALTRO" "ECOS"])
+
+# trajectory
+plot([])
+for t = 1:3:N-1
+    local p, F
+    p = [o.p[1][t][2:3], o.p[2][t][2:3]]
+    F = [F1.value[2:3, t], F2.value[2:3, t]]
+    visualize_square(Z.value[2:3,t], θ[t], p, F, o.mass*o.g[2:3], r=1, xlims=(-3,7), ylims=(-4,4.5), fa=t/(N-1))
+end
+plot!([])
