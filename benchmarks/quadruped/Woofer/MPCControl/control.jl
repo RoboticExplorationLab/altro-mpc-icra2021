@@ -59,7 +59,6 @@ function control!(
             J = LegJacobian(joint_pos[SLegIndexToRange(i)], i)
             cur_foot_vel_i = J * joint_vel[SLegIndexToRange(i)]
 
-            # FIXME only runs once per loop
             if regen_footstep
                 param.next_foot_loc[i] =
                     footstep_location(x_est, rot, param.cur_phase, i, param)

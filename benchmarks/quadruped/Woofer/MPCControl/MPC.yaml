@@ -1,41 +1,52 @@
-# MPC Parameters:
-yaw_angle: 0.0
-xy_vel: [0.0, 0.0]
-omega_z: 0.0
-stance_height: 0.28
-dynamics_discretization: 0.03
-update_dt: 0.03
-N: 20
-
-q: [1.0, 1.0, 5e2, 5e3, 5e3, 1e3, 5e2, 1e3, 1e3, 5e2, 5e2, 1e2]
-r: [1.0, 1.0, 1e-3, 1.0, 1.0, 1e-3, 1.0, 1.0, 1e-3, 1.0, 1.0, 1e-3]
-
-solver: "OSQP" # use Julia 1.2 for this
-# solver: "ALTRO"
-
-mu: 0.5
-min_vert_force: 0.0
-max_vert_force: 133.0
-
-# Gait:
+footstep_replan: 0.005
 gait:
   type: "trot"
   stance_time: 0.2
   swing_time: 0.2
-  # TODO: Add better fields here to specify arbitrary gait types?
-
-# Foot Placement:
+r:
+  - 1.0
+  - 1.0
+  - 0.001
+  - 1.0
+  - 1.0
+  - 0.001
+  - 1.0
+  - 1.0
+  - 0.001
+  - 1.0
+  - 1.0
+  - 0.001
+mu: 0.5
+max_vert_force: 133.0
+yaw_angle: 0.0
+N: 20
 foot_dx: 0.0
+solver: "OSQP"
+q:
+  - 1.0
+  - 1.0
+  - 500.0
+  - 5000.0
+  - 5000.0
+  - 1000.0
+  - 500.0
+  - 1000.0
+  - 1000.0
+  - 500.0
+  - 500.0
+  - 100.0
 foot_dy: 0.0
-
-footstep_replan: 0.005
-
-# Swing Parameters
+use_lqr: false
+omega_z: 0.0
+xy_vel:
+  - 0.0
+  - 0.0
+dynamics_discretization: 0.03
+velocity_control: true
+stance_height: 0.28
 swing:
-  step_height: 0.05 # distance of foot above ground during swing
-  omega: 100.0 # natural frequency of PD
-  zeta: 1.0 # damping of PD
-
-# Reference Trajectory Generation (possibly unnecessary)
-use_lqr: False
-velocity_control: True
+  omega: 100.0
+  step_height: 0.05
+  zeta: 1.0
+update_dt: 0.03
+min_vert_force: 0.0

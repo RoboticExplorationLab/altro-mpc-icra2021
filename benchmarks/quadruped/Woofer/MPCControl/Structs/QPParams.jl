@@ -74,7 +74,7 @@ function OptimizerParams(
         u[select(i,n)] = -d_ones
     end
 
-    ∞ = 5e2
+    ∞ = Inf
   
     # Control Constraints
     dyn_end = n*(N-1)
@@ -117,13 +117,14 @@ function OptimizerParams(
     A_osqp = sparse(C)
     P_osqp = sparse(P_osqp)
 
-    OSQP.setup!(model, P=P_osqp, q=q_osqp, A=A_osqp, l=l, u=u)
+    OSQP.setup!(model, P=P_osqp, q=q_osqp, A=A_osqp, l=l, u=u, verbose=false)
     OSQP.update_settings!(model, eps_abs = tol, eps_rel = tol, eps_prim_inf = tol, eps_dual_inf = tol)
 
     J = woofer.inertial.body_inertia
     sprung_mass = woofer.inertial.sprung_mass
 
     M = typeof(model)
+    R = typeof(results)
 
     A_vec = [@SMatrix zeros(n,n) for i=1:(N-1)]
     B_vec = [@SMatrix zeros(n,m) for i=1:(N-1)]

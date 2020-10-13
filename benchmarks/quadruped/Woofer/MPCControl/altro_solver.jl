@@ -165,7 +165,5 @@ function foot_forces!(
 
     param.forces = opt.U0[1]
 
-    # return b
-
-    return (opt.X0, opt.U0)
+    return b
 end

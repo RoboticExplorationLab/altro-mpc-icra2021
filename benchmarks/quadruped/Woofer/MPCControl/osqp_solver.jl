@@ -180,17 +180,13 @@ function foot_forces!(
     ds = [@SVector zeros(n) for i=1:(N-1)]
 
     update_osqp_model!(param, x_curr)
-    # b = @benchmark $results = OSQP.solve!($(param.optimizer.model)) samples=1 evals=1
+
+    # gets benchmark to return before populating results
+    b = @benchmark OSQP.solve!($(param.optimizer.model)) samples=1 evals=1
     results = OSQP.solve!(param.optimizer.model) 
     param.forces = results.x[n*(N-1) .+ select12(1)]
 
-    xs = [i==1 ? x_curr : results.x[select(i-1, n)] for i=1:(N)]
-    us = [results.x[n*(N-1) .+ select(i, m)] for i=1:(N-1)]
-
-    @show param.forces
-    @show results.info.run_time
-
-    return (xs, us)
+    return b
 end
 
 function select12(i)

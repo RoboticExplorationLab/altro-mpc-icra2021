@@ -1,92 +1,144 @@
 using LinearAlgebra
 using StaticArrays
+import StaticArrays: SUnitRange
 using Rotations
+using BenchmarkTools
+import YAML
+
+using MuJoCo # MuJoCo.jl is in the Lyceum Registry
 
 include("Woofer/QuadrupedDynamics.jl")
-include("Woofer/MPCControl/MPCControl.jl")
 include("Woofer/Utilities.jl")
 include("Woofer/Config.jl")
 
 using .QuadrupedDynamics
-import .MPCControl
 
-# IMPORTANT: to change which solver is used modify solver parameter in Woofer/MPCControl/MPC.yaml
-param = MPCControl.ControllerParams(Float64, Int64)
-N = param.N
+#################################################################################################################
+# Closed Loop Simulation in MuJoCo:
+# Trotting in Place
 
-x = [0.0, 0.0, 0.28, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-MPCControl.reference_trajectory!(x, param)
-t = 0.0
-MPCControl.foot_history!(t, param)
-(X, U) = MPCControl.foot_forces!(x, t, param)
-# MPCControl.foot_forces!(x, t, param)
+m = jlModel("woofer.xml")
+d = jlData(m)
 
-using YAML
-data = YAML.load(open("Woofer/MPCControl/MPC.yaml"))
+function get_state(d)
+    q = d.qpos
+    q̇ = d.qvel
+    rot = UnitQuaternion(q[4], q[5], q[6], q[7])
+    mrp = MRP(rot)
+    ω = rot \ q̇[SUnitRange(4, 6)]
 
-Q = Diagonal(data["q"])
-R = Diagonal(data["r"])
+    x = [   q[SUnitRange(1, 3)]; 
+            Rotations.params(mrp); 
+            q̇[SUnitRange(1, 3)]; 
+            ω   ]
 
-select(i, n) = (n*(i-1)+1):(n*(i-1)+n)
-ϵ = 1e-6
-μ = data["mu"]
-min_vert_force = data["min_vert_force"]
-max_vert_force = data["max_vert_force"]
-
-# check dynamics
-for i=1:N-1
-    @assert maximum(abs.(X[i+1] - (param.optimizer.A_vec[i]*X[i] + param.optimizer.B_vec[i]*U[i] + param.optimizer.d_vec[i]))) <= 1e-5
-
-    for j=1:4
-        u_j = U[i][select(j, 3)]
-
-        @assert abs(u_j[1]) <= μ*u_j[3] + ϵ
-        @assert abs(u_j[2]) <= μ*u_j[3] + ϵ
-
-        @assert u_j[3] <= max_vert_force + ϵ
-        @assert u_j[3] >= min_vert_force - ϵ
-    end
+    return x
 end
 
+# annoying way to get rid of knee joint measurements
+get_joint_pos(d) = d.qpos[@SVector [8,9,11,13,14,16,18,19,21,23,24,26]]
+get_joint_vel(d) = d.qvel[@SVector [7,8,10,12,13,15,17,18,20,22,23,25]]
 
+low_level_control_dt = 0.001
+last_control_update = -0.1
+last_mpc_update = -0.1
 
-objective_value_(X, U) = sum([0.5*(X[i] - param.x_ref[i])'*Q*(X[i] - param.x_ref[i]) for i=1:N]) + sum([0.5*U[i]'*R*U[i] for i=1:N-1])
-@show objective_value_(X, U)
+tf = 2.0
+steps = round(tf/m.opt.timestep)
+
+τ = zeros(12)
+
+function change_solver(solver="ALTRO")
+    yaml_path = "Woofer/MPCControl/MPC.yaml"
+    data = YAML.load(open(yaml_path))
+    data["solver"] = solver
+    YAML.write_file(yaml_path, data)
+
+    nothing
+end
+
+change_solver("ALTRO")
+include("Woofer/MPCControl/MPCControl.jl")
+import .MPCControl
+
+altro_times = Float64[]
+param = MPCControl.ControllerParams(Float64, Int64)
+mpc_dt = param.mpc_update
+
+for i=1:steps
+    x = get_state(d)
+    q = get_joint_pos(d)
+    q̇ = get_joint_vel(d)
+    t = d.time
+
+    if (t - last_control_update) >= low_level_control_dt
+        # pull benchmark out of control function
+        if (t-last_mpc_update) >= mpc_dt
+            MPCControl.reference_trajectory!(x, param)
+            MPCControl.foot_history!(t, param)
+            b = MPCControl.foot_forces!(x, t, param)
+
+            push!(altro_times, b.times[1])
+
+            last_mpc_update = t
+        end
+
+        τ = MPCControl.control!(τ, x, q, q̇, t, param)
+
+        d.ctrl .= τ
+
+        last_control_update = t
+    end
+
+    mj_step(m, d);
+end
+
+println("Altro mean solve time: ", mean(altro_times)*1e-3, " μs.")
+
+change_solver("OSQP")
+include("Woofer/MPCControl/MPCControl.jl")
+import .MPCControl
+
+d = jlData(m)
+osqp_times = Float64[]
+param = MPCControl.ControllerParams(Float64, Int64)
+
+for i=1:steps
+    x = get_state(d)
+    q = get_joint_pos(d)
+    q̇ = get_joint_vel(d)
+    t = d.time
+
+    if (t - last_control_update) >= low_level_control_dt
+        # pull benchmark out of control function
+        if (t-last_mpc_update) >= mpc_dt
+            MPCControl.reference_trajectory!(x, param)
+            MPCControl.foot_history!(t, param)
+            b = MPCControl.foot_forces!(x, t, param)
+
+            push!(osqp_times, b.times[1])
+
+            last_mpc_update = t
+        end
+
+        τ = MPCControl.control!(τ, x, q, q̇, t, param)
+
+        d.ctrl .= τ
+
+        last_control_update = t
+    end
+
+    mj_step(m, d);
+end
+
+println("OSQP mean solve time: ", mean(osqp_times)*1e-3, " μs.")
 
 using Plots
 
-plot(1:(N-1), [X[i][10] for i=1:(N-1)])
+bins = collect(0:100:2000)
 
-plot(1:(N-1), [U[i][1] for i=1:(N-1)])
+histogram(altro_times ./ 1000, bins=bins, label="Altro", title="Altro Solve Time Histogram")
+png("altro_hist")
 
-# using MuJoCo # MuJoCo.jl is in the Lyceum Registry
-
-# m = jlModel("woofer.xml")
-# d = jlData(m)
-
-# function get_state(d)
-#     q = d.qpos
-#     q̇ = d.qvel
-#     rot = UnitQuaternion(q[4], q[5], q[6], q[7])
-#     mrp = MRP(rot)
-#     ω = rot \ q̇[SUnitRange(4, 6)]
-
-#     x = [   q[SUnitRange(1, 3)]; 
-#             Rotations.params(mrp); 
-#             q̇[SUnitRange(1, 3)]; 
-#             ω   ]
-
-#     return x
-# end
-
-# # annoying way to get rid of knee joint measurements
-# get_joint_pos(d) = d.qpos[@SVector [8,9,11,13,14,16,18,19,21,23,24,26]]
-# get_joint_vel(d) = d.qvel[@SVector [7,8,10,12,13,15,17,18,20,22,23,25]]
-
-# for i=1:100
-
-
-#     mj_step(m, d);
-#     println(d.qpos)
-# end
-
+histogram(osqp_times ./ 1000, bins=bins, title="OSQP Solve Time Histogram")
+png("osqp_hist")
