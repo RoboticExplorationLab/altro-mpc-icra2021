@@ -66,6 +66,7 @@ struct OptimizerParams{T, S, L, P, A}
 		problem = Problem(model, objective, x_des, tf, x0=zeros(n), constraints=constraints, integration=RD.PassThrough)
 		solver = ALTROSolver(problem)
 		set_options!(solver, projected_newton=false, dJ_counter_limit=20)
+		set_options!(solver, reset_duals=false, penalty_scaling=10., penalty_initial=1.0)
 
 		solve!(solver)
 

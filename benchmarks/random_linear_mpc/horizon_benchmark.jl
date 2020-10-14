@@ -50,7 +50,7 @@ function get_altro_benchmark(N)
 
     initial_controls!(solver, U_altro)
     initial_states!(solver, X_altro)
-    set_options!(solver, reset_duals=false, penalty_initial=10.0)
+    set_options!(solver, reset_duals=false, penalty_scaling=10., penalty_initial=1.0)
 
     # update x0 to see warmstarted solution:
     solver.solver_al.solver_uncon.x0 .= x0_warm
@@ -150,10 +150,14 @@ using Plots
 
 scale = 1e-6
 
-scatter(horizon_lengths, altro_no_ws .* scale, label="Altro", title="Random Linear Problem (no warmstart)", xlabel="Horizon Length", ylabel="Time (milliseconds)")
-scatter!(horizon_lengths, osqp_no_ws .* scale, label="OSQP")
-png("benchmarks/random_linear_mpc/no_warmstart_horizon")
+plot(horizon_lengths, altro_no_ws .* scale, label="Altro", title="Random Linear Problem (no warmstart)", xlabel="Horizon Length", ylabel="Time (milliseconds)")
+plot!(horizon_lengths, osqp_no_ws .* scale, label="OSQP")
+png("no_warmstart_horizon")
 
-scatter(horizon_lengths, altro_ws .* scale, label="Altro", title="Random Linear Problem (warmstart)", xlabel="Horizon Length", ylabel="Time (milliseconds)")
-scatter!(horizon_lengths, osqp_ws .* scale, label="OSQP")
-png("benchmarks/random_linear_mpc/warmstart_horizon")
+plot(horizon_lengths, altro_ws .* scale, label="Altro", title="Random Linear Problem (warmstart)", xlabel="Horizon Length", ylabel="Time (milliseconds)")
+plot!(horizon_lengths, osqp_ws .* scale, label="OSQP")
+png("warmstart_horizon")
+
+using JLD2
+
+@save "timing_data.jld2" altro_no_ws osqp_no_ws altro_ws osqp_ws
