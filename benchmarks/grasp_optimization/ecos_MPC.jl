@@ -1,16 +1,11 @@
-using Pkg
-Pkg.activate(@__DIR__)
-Pkg.instantiate()
-
-using StaticArrays, LinearAlgebra, Plots, BenchmarkTools
-using RobotDynamics
+using BenchmarkTools
 using Convex, ECOS
 
-include("src/visualize.jl")
-include("src/grasp_model.jl")
+include("src/grasp_model.jl") # generates model o, x0, xf
 
+## GENERATE REFERENCE TRAJECTORY OVER FULL HORIZON
 ex = 2
-include("example$ex.jl")
+include("settings$ex.jl") # creates o, x0, xf
 
 # indices for convenience
 pos_ind = 1:Int(n/2)
@@ -54,43 +49,44 @@ for t = 1:N-1
 end
 
 # solve
-Convex.solve!(prob, ECOS.Optimizer)
+Convex.solve!(prob, ECOS.Optimizer(feastol=1e-4, abstol=1e-4, reltol=1e-4))
 
 X_cold = Z.value
 U_cold = [F1.value; F2.value]
 
-## RUN MPC
-include("src/mpc.jl")
+## RUN MPC AND STORE SOLVE TIMES
+include("src/mpc_helpers_ecos.jl")
 
-# Initial Conditions
 x_curr = X_cold[:, 1] # Current state (x, v)
-u_curr = X_cold[:, 1] # Controls (u) applied at this instant
+u_curr = U_cold[:, 1] # Controls (u) applied at this instant
 hor = 10 # length of the MPC horizon in number of steps
 
-benchmark_arr = []
-MPC_Iteration_States = []
+ecos_times = []
+ecos_states = []
+ecos_controls = []
 num_iters = N - hor - 1
-push!(MPC_Iteration_States, x_curr)
+push!(ecos_states, x_curr)
 
 for iter in 1:num_iters
     global x_curr, u_curr
+    local prob, b, F1, F2
     # Propagate the physics forward to the next timestep
     x_curr = noisy_discrete_dynamics(o, x_curr, u_curr, dt)
 
-    # Compute next control
-    u_curr, b = ecos_mpc_step(o, x_curr, X_cold[:, iter + hor], hor, iter)
-    println("Iter = $iter & Median Time = $(round(median(b.times) / 1e6, digits=2)) ms")
+    # Setup and solve
+    prob, F1, F2 = ecos_mpc_setup(o, x_curr, X_cold[:, iter + hor], hor, iter)
+    b = @benchmark Convex.solve!($prob, ECOS.Optimizer(verbose=0)) samples=3 evals=1
+    Convex.solve!(prob, ECOS.Optimizer(verbose=0))
+    println(prob.status)
+
+    # extract control
+    u_curr = [F1.value[:, 1]; F2.value[:, 1]]
+
+    # printouts
+    println("Iter $iter: $(round(median(b).time/1e6, digits=2)) ms")
 
     # push values
-    push!(MPC_Iteration_States, x_curr)
-    push!(benchmark_arr, b)
+    append!(ecos_times, b.times/1e6)
+    push!(ecos_states, x_curr)
+    push!(ecos_controls, u_curr)
 end
-
-# plot trajectory
-x = [MPC_Iteration_States[t][1] for t = 1:num_iters]
-y = [MPC_Iteration_States[t][2] for t = 1:num_iters]
-z = [MPC_Iteration_States[t][3] for t = 1:num_iters]
-xd = [MPC_Iteration_States[t][4] for t = 1:num_iters]
-yd = [MPC_Iteration_States[t][5] for t = 1:num_iters]
-zd = [MPC_Iteration_States[t][6] for t = 1:num_iters]
-plot([x y z xd yd zd], label = ["x" "y" "z" "xd" "yd" "zd"])

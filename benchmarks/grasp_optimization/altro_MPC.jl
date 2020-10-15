@@ -1,21 +1,14 @@
-using Pkg
-Pkg.activate(@__DIR__)
-Pkg.instantiate()
-
+using BenchmarkTools
 using TrajectoryOptimization
 const TO = TrajectoryOptimization
-using StaticArrays, LinearAlgebra
-using RobotDynamics
-using Plots
-using BenchmarkTools
 
-include("src/grasp_model.jl")
-include("src/visualize.jl")
+include("src/grasp_model.jl") # generates model o, x0, xf
 
 ## GENERATE REFERENCE TRAJECTORY OVER FULL HORIZON
 ex = 2
-include("example$ex.jl")
+include("settings$ex.jl") # creates o, x0, xf
 
+# indices for convenience
 pos_ind = 1:Int(n/2)
 vel_ind = 1+Int(n/2):n
 u_ind = n .+ (1:m)
@@ -95,54 +88,53 @@ X_cold = states(altro)
 U_cold = controls(altro)
 
 ## RUN MPC
-include("src/mpc.jl")
+include("src/mpc_helpers_altro.jl")
 
 # Initial Conditions
 x_curr = X_cold[1] # Current state (x, v)
 u_curr = U_cold[1] # Controls (u) applied at this instant
 hor = 10 # length of the MPC horizon in number of steps
 
-obj, conSet = MPC_SetUp(o, x0, xf, hor, 0)
-
-benchmark_arr = []
-MPC_Iteration_States = []
+altro_times = []
+altro_states = []
+altro_controls = []
 num_iters = N - hor - 1
 
 for iter in 1:num_iters
     global x_curr, u_curr
-    local obj, conSet
+    local X_warm, U_warm, obj, conSet, prob, altro, b
+
     # Propagate the physics forward to the next timestep
     x_curr = noisy_discrete_dynamics(o, x_curr, u_curr, dt)
-    push!(MPC_Iteration_States, x_curr)
-
-    # Update objective and constraints
-    obj, conSet = MPC_SetUp(o, x0, xf, hor, iter)
 
     # Construct the warm-started state and control arrays
     X_warm = [[x_curr]; X_cold[2 + iter:hor + iter]]
     U_warm = U_cold[1 + iter:hor + iter]
 
-    # Construct the Problem
-    p = warmstart_problem(o, obj, conSet, X_warm, U_warm, dt * hor)
+    # Set up problem
+    obj, conSet = altro_mpc_setup(o, X_warm, U_warm, hor, iter)
+    prob = Problem(o, obj, X_warm[end], dt*hor, x0=SVector{n}(X_warm[1]), constraints=conSet);
 
-    # Solve the next iteration
-    b, altro_mpc = MPC_Solve(p, opts)
-    push!(benchmark_arr, b)
+    initial_controls!(prob, U_warm)
+    initial_states!(prob, X_warm)
+    rollout!(prob)
 
-    # Grab the new optimized trajectory
-    X_new = states(altro_mpc)
-    U_new = controls(altro_mpc)
+    # Solve
+    altro = ALTROSolver(prob, opts)
+    set_options!(altro, show_summary=false, verbose=0)
+    solve!(altro)
+    b = benchmark_solve!(altro, samples=3, evals=1)
+
+    # extract control
+    U_new = controls(prob)
     u_curr = U_new[1]
 
-    print("Iter = $iter @ Violation = $(TrajectoryOptimization.max_violation(altro_mpc))")
-    println(" & Median Time = $(round(median(b.times) / 1e6, digits=2)) ms")
-end
+    # printouts
+    println("Iter $iter: $(round(median(b).time/1e6, digits=2)) ms")
+    println("Max violation: $(TrajectoryOptimization.max_violation(altro))")
 
-# plot trajectory
-x = [MPC_Iteration_States[t][1] for t = 1:num_iters]
-y = [MPC_Iteration_States[t][2] for t = 1:num_iters]
-z = [MPC_Iteration_States[t][3] for t = 1:num_iters]
-xd = [MPC_Iteration_States[t][4] for t = 1:num_iters]
-yd = [MPC_Iteration_States[t][5] for t = 1:num_iters]
-zd = [MPC_Iteration_States[t][6] for t = 1:num_iters]
-plot([x y z xd yd zd], label = ["x" "y" "z" "xd" "yd" "zd"])
+    # push values
+    append!(altro_times, b.times/1e6)
+    push!(altro_states, x_curr)
+    push!(altro_controls, u_curr)
+end

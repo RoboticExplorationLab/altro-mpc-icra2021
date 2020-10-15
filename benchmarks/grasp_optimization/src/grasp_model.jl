@@ -1,4 +1,5 @@
 include("utils.jl")
+using RobotDynamics
 import RobotDynamics: dynamics, AbstractModel
 
 # set up model

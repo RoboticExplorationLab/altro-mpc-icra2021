@@ -10,7 +10,7 @@ include("src/visualize.jl")
 include("src/grasp_model.jl")
 
 ex = 2
-include("example$ex.jl")
+include("settings$ex.jl")
 
 # indices for convenience
 pos_ind = 1:Int(n/2)
