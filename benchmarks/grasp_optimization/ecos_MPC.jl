@@ -73,8 +73,12 @@ for iter in 1:num_iters
     # Propagate the physics forward to the next timestep
     x_curr = noisy_discrete_dynamics(o, x_curr, u_curr, dt)
 
+    # Construct the warm-started state and control arrays
+    X_warm = [x_curr X_cold[:, 2 + iter:hor + iter]]
+    U_warm = U_cold[:, 1 + iter:hor + iter-1]
+
     # Setup and solve
-    prob, F1, F2 = ecos_mpc_setup(o, x_curr, X_cold[:, iter + hor], hor, iter)
+    prob, F1, F2 = ecos_mpc_setup(o, X_warm, U_warm, hor, iter)
     b = @benchmark Convex.solve!($prob, ECOS.Optimizer(verbose=0, feastol=1e-4, abstol=1e-4, reltol=1e-4)) samples=3 evals=1
     Convex.solve!(prob, ECOS.Optimizer(verbose=0))
     println(prob.status)

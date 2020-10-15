@@ -78,12 +78,9 @@ opts = SolverOptions(
     constraint_tolerance=1e-4
 )
 
-# normal solve
+# solve
 altro = ALTROSolver(prob, opts)
-set_options!(altro, show_summary=true)
 solve!(altro)
-set_options!(altro, show_summary=false, verbose=0)
-benchmark_solve!(altro, samples=2, evals=2)
 
 # extract results
 X_cold = states(altro)
@@ -122,9 +119,8 @@ for iter in 1:num_iters
 
     # Solve
     altro = ALTROSolver(prob, opts)
-    set_options!(altro, show_summary=true, verbose=0)
-    solve!(altro)
     set_options!(altro, show_summary=false, verbose=0)
+    solve!(altro)
     b = benchmark_solve!(altro, samples=3, evals=1)
 
     # extract control
