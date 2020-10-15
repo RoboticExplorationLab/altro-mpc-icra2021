@@ -1,4 +1,4 @@
-N = 30          # horizon
+N = 31          # horizon
 tf = 3.        # final time
 dt = tf/(N-1)   # time step
 n = 6           # state size

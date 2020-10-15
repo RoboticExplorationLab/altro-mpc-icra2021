@@ -64,7 +64,7 @@ hor = 10 # length of the MPC horizon in number of steps
 ecos_times = []
 ecos_states = []
 ecos_controls = []
-num_iters = N - hor - 1
+num_iters = N - hor - 2
 push!(ecos_states, x_curr)
 
 for iter in 1:num_iters
@@ -75,7 +75,7 @@ for iter in 1:num_iters
 
     # Setup and solve
     prob, F1, F2 = ecos_mpc_setup(o, x_curr, X_cold[:, iter + hor], hor, iter)
-    b = @benchmark Convex.solve!($prob, ECOS.Optimizer(verbose=0)) samples=3 evals=1
+    b = @benchmark Convex.solve!($prob, ECOS.Optimizer(verbose=0, feastol=1e-4, abstol=1e-4, reltol=1e-4)) samples=3 evals=1
     Convex.solve!(prob, ECOS.Optimizer(verbose=0))
     println(prob.status)
 

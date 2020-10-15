@@ -1,4 +1,4 @@
-function altro_mpc_setup(o::SquareObject, X_warm, U_warm, N, shift)
+function altro_mpc_setup(o::SquareObject, X_warm, U_warm, N, shift=0)
     n, m = size(o)
     xf = X_warm[end]
 
@@ -10,9 +10,9 @@ function altro_mpc_setup(o::SquareObject, X_warm, U_warm, N, shift)
 
     # Update the Reference Trajectory
     for k in 1:N-1
-        TO.set_LQR_goal!(prob.obj.cost[k], X_warm[k], U_warm[k])
+        TO.set_LQR_goal!(obj.cost[k], X_warm[k], U_warm[k])
     end
-    TO.set_LQR_goal!(prob.obj.cost[end], X_warm[end])
+    TO.set_LQR_goal!(obj.cost[end], X_warm[end])
 
     # Create Empty ConstraintList
     conSet = ConstraintList(n,m,N)
@@ -21,13 +21,12 @@ function altro_mpc_setup(o::SquareObject, X_warm, U_warm, N, shift)
     goal = GoalConstraint(SVector{n}(xf))
     add_constraint!(conSet, goal, N)
 
-    include("src/new_constraints.jl")
     for i = 1:N-1
         i_s = i + shift
 
         # Torque Balance
         B = [o.B[1][i_s] o.B[2][i_s]]
-        t_bal = LinearConstraint(n, m, B, [θdd[i_s],0,0], Equality(), u_ind)
+        t_bal = LinearConstraint2(n, m, B, [θdd[i_s],0,0], Equality(), u_ind)
         add_constraint!(conSet, t_bal, i:i)
 
         # Max Grasp Force
@@ -52,4 +51,51 @@ function altro_mpc_setup(o::SquareObject, X_warm, U_warm, N, shift)
     end
 
     return obj, conSet
+end
+
+function altro_mpc_update!(prob, o::SquareObject, X_warm, U_warm, N, shift)
+    n, m = size(o)
+    xf = X_warm[end]
+
+    # Update the Reference Trajectory
+    TO.set_initial_state!(prob, X_warm[1])
+    for k in 1:N-1
+        TO.set_LQR_goal!(prob.obj.cost[k], X_warm[k], U_warm[k])
+    end
+    TO.set_LQR_goal!(prob.obj.cost[end], X_warm[end])
+
+    # Goal Constraint
+    prob.constraints[1].xf .= xf
+
+    i_c = 2 # constraint index
+    for i = 1:N-1
+        i_s = i + shift # index for v an B matrices
+
+        # Torque Balance
+        prob.constraints[i_c].A .= [o.B[1][i_s] o.B[2][i_s]]
+        prob.constraints[i_c].b .= [θdd[i_s], 0, 0]
+        i_c += 1
+
+        # Max Grasp Force
+        prob.constraints[i_c].A[1,1:Int(m/2)] .= o.v[1][i_s]
+        prob.constraints[i_c].A[2,1+Int(m/2):end] .= o.v[2][i_s]
+        i_c += 1
+
+        # SOCP friction cone
+        v1_i = o.v[1][i_s]
+        prob.constraints[i_c].A .= (I - v1_i*v1_i')
+        prob.constraints[i_c].c .= o.mu*v1_i
+        i_c += 1
+
+        v2_i = o.v[2][i_s]
+        prob.constraints[i_c].A .= (I - v2_i*v2_i')
+        prob.constraints[i_c].c .= o.mu*v2_i
+        i_c += 1
+    end
+
+    initial_controls!(prob, U_warm)
+    initial_states!(prob, X_warm)
+    rollout!(prob)
+    
+    return
 end

@@ -35,7 +35,7 @@ for i = 1:N-1
 
     # Torque Balance
     B = [o.B[1][i] o.B[2][i]]
-    t_bal = LinearConstraint(n, m, B, [θdd[i],0,0], Equality(), u_ind)
+    t_bal = LinearConstraint2(n, m, B, [θdd[i],0,0], Equality(), u_ind)
     add_constraint!(conSet, t_bal, i:i)
 
     # Max Grasp Force
@@ -71,8 +71,8 @@ using Altro
 # for example 2, solves in 50 ms
 opts = SolverOptions(
     verbose = 1,
-    projected_newton_tolerance=1e-5,
-    cost_tolerance_intermediate=1e-5,
+    projected_newton_tolerance=1e-4,
+    cost_tolerance_intermediate=1e-4,
     penalty_scaling=10.,
     penalty_initial=1.0,
     constraint_tolerance=1e-4
@@ -82,6 +82,8 @@ opts = SolverOptions(
 altro = ALTROSolver(prob, opts)
 set_options!(altro, show_summary=true)
 solve!(altro)
+set_options!(altro, show_summary=false, verbose=0)
+benchmark_solve!(altro, samples=2, evals=2)
 
 # extract results
 X_cold = states(altro)
@@ -95,14 +97,18 @@ x_curr = X_cold[1] # Current state (x, v)
 u_curr = U_cold[1] # Controls (u) applied at this instant
 hor = 10 # length of the MPC horizon in number of steps
 
+# Set up problem
+obj, conSet = altro_mpc_setup(o, X_cold[1:hor], U_cold[1:hor], hor)
+prob = Problem(o, obj, X_cold[hor], dt*(hor-1), x0=X_cold[1], constraints=conSet)
+
 altro_times = []
 altro_states = []
 altro_controls = []
-num_iters = N - hor - 1
+num_iters = N - hor - 2
 
 for iter in 1:num_iters
-    global x_curr, u_curr
-    local X_warm, U_warm, obj, conSet, prob, altro, b
+    global x_curr, u_curr, prob, altro, opts
+    local X_warm, U_warm, b
 
     # Propagate the physics forward to the next timestep
     x_curr = noisy_discrete_dynamics(o, x_curr, u_curr, dt)
@@ -111,22 +117,18 @@ for iter in 1:num_iters
     X_warm = [[x_curr]; X_cold[2 + iter:hor + iter]]
     U_warm = U_cold[1 + iter:hor + iter]
 
-    # Set up problem
-    obj, conSet = altro_mpc_setup(o, X_warm, U_warm, hor, iter)
-    prob = Problem(o, obj, X_warm[end], dt*hor, x0=SVector{n}(X_warm[1]), constraints=conSet);
-
-    initial_controls!(prob, U_warm)
-    initial_states!(prob, X_warm)
-    rollout!(prob)
+    # Update problem
+    altro_mpc_update!(prob, o, X_warm, U_warm, hor, iter)
 
     # Solve
     altro = ALTROSolver(prob, opts)
-    set_options!(altro, show_summary=false, verbose=0)
+    set_options!(altro, show_summary=true, verbose=0)
     solve!(altro)
+    set_options!(altro, show_summary=false, verbose=0)
     b = benchmark_solve!(altro, samples=3, evals=1)
 
     # extract control
-    U_new = controls(prob)
+    U_new = controls(altro)
     u_curr = U_new[1]
 
     # printouts
