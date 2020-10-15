@@ -1,0 +1,214 @@
+<!-- Stanford Woofer Model
+
+    The state space is populated with joints in the order that they are
+    defined in this file.
+-->
+<mujoco model="woofer">
+    <compiler angle="radian" coordinate="local" inertiafromgeom="auto"/>
+
+    <default>
+        <joint armature="0.0024" solimplimit="0.9 0.95 0.001" solreflimit="0.001 1" stiffness="0"/>
+        <geom conaffinity="0" condim="3" contype="1" friction="1.5 .1 .1" rgba="0.8 0.6 .4 1" solimp="0.9 0.95 0.001" solref="0.005 2"/>
+        <motor ctrllimited="true" forcelimited="true"/>
+    </default>
+
+    <option>
+        <flag sensornoise="enable"/>
+    </option>
+
+    <sensor>
+        <accelerometer name="accel" noise="0.01" site="imu_site"/>
+        <gyro name="gyro" noise="0.02" site="imu_site"/>
+
+        <jointpos joint="fr_x" noise="0.001"/>
+        <jointpos joint="fr_thigh_1" noise="0.001"/>
+        <jointpos joint="fr_thigh_2" noise="0.001"/>
+
+        <jointpos joint="fl_x" noise="0.001"/>
+        <jointpos joint="fl_thigh_1" noise="0.001"/>
+        <jointpos joint="fl_thigh_2" noise="0.001"/>
+
+        <jointpos joint="br_x" noise="0.001"/>
+        <jointpos joint="br_thigh_1" noise="0.001"/>
+        <jointpos joint="br_thigh_2" noise="0.001"/>
+
+        <jointpos joint="bl_x" noise="0.001"/>
+        <jointpos joint="bl_thigh_1" noise="0.001"/>
+        <jointpos joint="bl_thigh_2" noise="0.001"/>
+
+        <jointvel joint="fr_x" noise="0.01"/>
+        <jointvel joint="fr_thigh_1" noise="0.01"/>
+        <jointvel joint="fr_thigh_2" noise="0.01"/>
+
+        <jointvel joint="fl_x" noise="0.01"/>
+        <jointvel joint="fl_thigh_1" noise="0.01"/>
+        <jointvel joint="fl_thigh_2" noise="0.01"/>
+
+        <jointvel joint="br_x" noise="0.01"/>
+        <jointvel joint="br_thigh_1" noise="0.01"/>
+        <jointvel joint="br_thigh_2" noise="0.01"/>
+
+        <jointvel joint="bl_x" noise="0.01"/>
+        <jointvel joint="bl_thigh_1" noise="0.01"/>
+        <jointvel joint="bl_thigh_2" noise="0.01"/>
+    </sensor>
+
+    <size nstack="300000" nuser_geom="1"/>
+
+    <option timestep="0.0001"/>
+    <asset>
+        <texture builtin="gradient" height="100" rgb1="1 1 1" rgb2="0 0 0" type="skybox" width="100"/>
+        <texture builtin="flat" height="1278" mark="cross" markrgb="1 1 1" name="texgeom" random="0.01" rgb1="0.8 0.6 0.4" rgb2="0.8 0.6 0.4" type="cube" width="127"/>
+        <texture builtin="checker" height="100" name="texplane" rgb1="0 0 0" rgb2="0.8 0.8 0.8" type="2d" width="100"/>
+        <material name="MatPlane" reflectance="0.5" shininess="1" specular="1" texrepeat="60 60" texture="texplane"/>
+        <material name="geom" texture="texgeom" texuniform="true"/>
+    </asset>
+
+
+    <worldbody>
+        <light cutoff="100" diffuse="1 1 1" dir="-0 0 -1.3" directional="true" exponent="1" pos="0 0 1.3" specular=".1 .1 .1"/>
+        <geom conaffinity="1" condim="3" material="MatPlane" name="floor" pos="0 0 0" rgba="0.8 0.9 0.8 1" size="40 40 40" type="plane"/>
+
+
+        <body name="torso" pos="0 0 0.2845751311064591">
+            <camera name="track" mode="trackcom" pos="0 -2 0.3" xyaxes="1 0 0 0 0 1"/>
+            <joint armature="0" axis="1 0 0" damping="0" limited="false" name="rootx" pos="0 0 0" stiffness="0" type="free"/>
+
+            <inertial pos="0 0 0" mass="3.0" diaginertia="0.0065733 0.074011 0.077763"/>
+            <geom pos="0 0 0" name="torso" size="0.33 0.088 0.046" type="box"/>
+
+            <site name="imu_site" pos="0 0 0" size=".01 .01 .01" type="box"/>
+
+            <body name="fr_module" pos="0.23 -0.109 0">
+                <geom pos="-0.029 0 0" name="fr_block" type="box" size="0.094 0.031 0.03" rgba="0.6 0.8 .4 1"/>
+                <joint axis="1 0 0" name="fr_x" pos="0 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                <inertial pos="0 0 0" mass="1.033" fullinertia="0.002449 0.005043 0.006616 -0.001784 -.00002 -0.000007"/>
+                <body name="fr_thigh_1" pos="0.09 -0.064 0">
+                    <joint axis="0 1 0" name="fr_thigh_1" pos="-0.09 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                    <!-- <inertial pos="0 0 0" mass="0.07"/> -->
+                    <geom axisangle="0 1 0 1.57" name="fr_thigh_1" size="0.02 0.09" type="capsule" rgba = "1 0 0 0.5" mass="0.07"/>
+                    <body name="fr_shin_1" pos="0.00 0 -0.13228756555322954">
+                        <joint axis="0 1 0" name="fr_shin_1" pos="0.09 0 0.13228756555322954" type="hinge"/>
+                        <!-- <inertial pos="0 0 0" mass="0.059"/> -->
+                        <geom axisangle="0 1 0 0.5974064166453502" name="fr_shin_1" rgba="0 1 1 1" size="0.02 0.16" type="capsule" mass="0.059"/>
+                    </body>
+                </body>
+                <body name="fr_thigh_2" pos="-0.09 -0.064 0">
+                    <joint axis="0 1 0" name="fr_thigh_2" pos="0.09 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                    <!-- <inertial pos="0 0 0" mass="0.07"/> -->
+                    <geom axisangle="0 1 0 1.57" name="fr_thigh_2" size="0.02 0.09" type="capsule" rgba = "1 0 0 0.5" mass="0.07"/>
+                    <body name="fr_shin_2" pos="0.00 0 -0.13228756555322954">
+                        <joint axis="0 1 0" name="fr_shin_2" pos="-0.09 0 0.13228756555322954" type="hinge"/>
+                        <!-- <inertial pos="0 0 0" mass="0.059"/> -->
+                        <geom axisangle="0 1 0 -0.5974064166453502" name="fr_shin_2" rgba="0 1 1 1" size="0.02 0.16" type="capsule" mass="0.059"/>
+                    </body>
+                </body>
+            </body>
+
+            <body name="fl_module" pos="0.23 0.109 0">
+                <geom pos = "-0.029 0 0" name="fl_block" type="box" size="0.094 0.031 0.03" rgba="0.6 0.8 .4 1"/>
+                <joint axis="1 0 0" name="fl_x" pos="0 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                <inertial pos="0 0 0" mass="1.033" fullinertia="0.002449 0.005043 0.006616 -0.001784 -.00002 -0.000007"/>
+                <body name="fl_thigh_1" pos="0.09 0.064 0">
+                    <joint axis="0 1 0" name="fl_thigh_1" pos="-0.09 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                    <!-- <inertial pos="0 0 0" mass="0.07"/> -->
+                    <geom axisangle="0 1 0 1.57" name="fl_thigh_1" size="0.02 0.09" type="capsule" rgba = "1 0 0 0.5" mass="0.07"/>
+                    <body name="fl_shin_1" pos="0.00 0 -0.13228756555322954">
+                        <joint axis="0 1 0" name="fl_shin_1" pos="0.09 0 0.13228756555322954" type="hinge"/>
+                        <!-- <inertial pos="0 0 0" mass="0.059"/> -->
+                        <geom axisangle="0 1 0 0.5974064166453502" name="fl_shin_1" rgba="0 1 1 1" size="0.02 0.16" type="capsule" mass="0.059"/>
+                    </body>
+                </body>
+                <body name="fl_thigh_2" pos="-0.09 0.064 0">
+                    <joint axis="0 1 0" name="fl_thigh_2" pos="0.09 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                    <!-- <inertial pos="0 0 0" mass="0.07"/> -->
+                    <geom axisangle="0 1 0 1.57" name="fl_thigh_2" size="0.02 0.09" type="capsule" rgba = "1 0 0 0.5" mass="0.07"/>
+                    <body name="fl_shin_2" pos="0.00 0 -0.13228756555322954">
+                        <joint axis="0 1 0" name="fl_shin_2" pos="-0.09 0 0.13228756555322954" type="hinge"/>
+                        <!-- <inertial pos="0 0 0" mass="0.059"/> -->
+                        <geom axisangle="0 1 0 -0.5974064166453502" name="fl_shin_2" rgba="0 1 1 1" size="0.02 0.16" type="capsule" mass="0.059"/>
+                    </body>
+                </body>
+            </body>
+
+            <body name="br_module" pos="-0.23 -0.109 0">
+                <geom pos="0.029 0 0" name="br_block" type="box" size="0.094 0.031 0.03" rgba="0.6 0.8 .4 1"/>
+                <joint axis="1 0 0" name="br_x" pos="0 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                <inertial pos="0 0 0" mass="1.033" fullinertia="0.002449 0.005043 0.006616 -0.001784 -.00002 -0.000007"/>
+                <body name="br_thigh_1" pos="0.09 -0.064 0">
+                    <joint axis="0 1 0" name="br_thigh_1" pos="-0.09 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                    <!-- <inertial pos="0 0 0" mass="0.07"/> -->
+                    <geom axisangle="0 1 0 1.57" name="br_thigh_1" size="0.02 0.09" type="capsule" rgba = "1 0 0 0.5" mass="0.07"/>
+                    <body name="br_shin_1" pos="0.00 0 -0.13228756555322954">
+                        <joint axis="0 1 0" name="br_shin_1" pos="0.09 0 0.13228756555322954" type="hinge"/>
+                        <!-- <inertial pos="0 0 0" mass="0.059"/> -->
+                        <geom axisangle="0 1 0 0.5974064166453502" name="br_shin_1" rgba="0 1 1 1" size="0.02 0.16" type="capsule" mass="0.059"/>
+                    </body>
+                </body>
+
+                <body name="br_thigh_2" pos="-0.09 -0.064 0">
+                    <joint axis="0 1 0" name="br_thigh_2" pos="0.09 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                    <!-- <inertial pos="0 0 0" mass="0.07"/> -->
+                    <geom axisangle="0 1 0 1.57" name="br_thigh_2" size="0.02 0.09" type="capsule" rgba = "1 0 0 0.5" mass="0.07"/>
+                    <body name="br_shin_2" pos="0.00 0 -0.13228756555322954">
+                        <joint axis="0 1 0" name="br_shin_2" pos="-0.09 0 0.13228756555322954" type="hinge"/>
+                        <!-- <inertial pos="0 0 0" mass="0.059"/> -->
+                        <geom axisangle="0 1 0 -0.5974064166453502" name="br_shin_2" rgba="0 1 1 1" size="0.02 0.16" type="capsule" mass="0.059"/>
+                    </body>
+                </body>
+            </body>
+
+            <body name="bl_module" pos="-0.23 0.109 0">
+                <geom pos = "0.029 0 0" name="bl_block" type="box" size="0.094 0.031 0.03" rgba="0.6 0.8 .4 1"/>
+                <joint axis="1 0 0" name="bl_x" pos="0 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                <inertial pos="0 0 0" mass="1.033" fullinertia="0.002449 0.005043 0.006616 -0.001784 -.00002 -0.000007"/>
+                <body name="bl_thigh_1" pos="0.09 0.064 0">
+                    <joint axis="0 1 0" name="bl_thigh_1" pos="-0.09 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                    <!-- <inertial pos="0 0 0" mass="0.07"/> -->
+                    <geom axisangle="0 1 0 1.57" name="bl_thigh_1" size="0.02 0.09" type="capsule" rgba = "1 0 0 0.5" mass="0.07"/>
+                    <body name="bl_shin_1" pos="0.00 0 -0.13228756555322954">
+                        <joint axis="0 1 0" name="bl_shin_1" pos="0.09 0 0.13228756555322954" type="hinge"/>
+                        <!-- <inertial pos="0 0 0" mass="0.059"/> -->
+                        <geom axisangle="0 1 0 0.5974064166453502" name="bl_shin_1" rgba="0 1 1 1" size="0.02 0.16" type="capsule" mass="0.059"/>
+                    </body>
+                </body>
+
+                <body name="bl_thigh_2" pos="-0.09 0.064 0">
+                    <joint axis="0 1 0" name="bl_thigh_2" pos="0.09 0 0" limited="true" range="-3.0 3.0" type="hinge" damping="0.2"/>
+                    <!-- <inertial pos="0 0 0" mass="0.07"/> -->
+                    <geom axisangle="0 1 0 1.57" name="bl_thigh_2" size="0.02 0.09" type="capsule" rgba = "1 0 0 0.5"  mass="0.07"/>
+                    <body name="bl_shin_2" pos="0.00 0 -0.13228756555322954">
+                        <joint axis="0 1 0" name="bl_shin_2" pos="-0.09 0 0.13228756555322954" type="hinge"/>
+                        <!-- <inertial pos="0 0 0" mass="0.059"/> -->
+                        <geom axisangle="0 1 0 -0.5974064166453502" name="bl_shin_2" rgba="0 1 1 1" size="0.02 0.16" type="capsule" mass="0.059"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+    </worldbody>
+
+    <equality>
+        <connect name="fr_connect" body1="fr_shin_1" body2="fr_shin_2" anchor="-0.09 0 -0.133"/>
+        <connect name="fl_connect" body1="fl_shin_1" body2="fl_shin_2" anchor="-0.09 0 -0.133"/>
+        <connect name="br_connect" body1="br_shin_1" body2="br_shin_2" anchor="-0.09 0 -0.133"/>
+        <connect name="bl_connect" body1="bl_shin_1" body2="bl_shin_2" anchor="-0.09 0 -0.133"/>
+    </equality>
+
+    <actuator>
+        <motor gear="1" joint="fr_x" name="fr_x" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+        <motor gear="1" joint="fr_thigh_1" name="fr_thigh_1" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+        <motor gear="1" joint="fr_thigh_2" name="fr_thigh_2" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+
+        <motor gear="1" joint="fl_x" name="fl_x" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+        <motor gear="1" joint="fl_thigh_1" name="fl_thigh_1" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+        <motor gear="1" joint="fl_thigh_2" name="fl_thigh_2" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+
+        <motor gear="1" joint="br_x" name="br_x" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+        <motor gear="1" joint="br_thigh_1" name="br_thigh_1" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+        <motor gear="1" joint="br_thigh_2" name="br_thigh_2" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+
+        <motor gear="1" joint="bl_x" name="bl_x" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+        <motor gear="1" joint="bl_thigh_1" name="bl_thigh_1" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+        <motor gear="1" joint="bl_thigh_2" name="bl_thigh_2" forcerange="-12.0 12.0" ctrlrange="-12.0 12.0"/>
+    </actuator>
+</mujoco>

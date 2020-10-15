@@ -1,0 +1,30 @@
+inertial:
+  frame_mass: 3.0
+  module_mass: 1.033
+  upper_link_mass: 0.070
+  lower_link_mass: 0.059
+  body_ix: 0.025
+  body_iy: 0.854
+  body_iz: 0.897
+
+actuator:
+  max_joint_torque: 12.0
+  max_leg_force: 133.0
+  revolute_range: 3.0
+
+geometry:
+  hip_center_y: 0.109
+  hip_center_x: 0.230
+  abduction_offset: 0.064
+  foot_radius: 0.02
+
+  module_length: 0.188
+  module_width: 0.062
+  module_height: 0.060
+
+  body_length: 0.66
+  body_width: 0.176
+  body_height: 0.092
+
+  upper_link_length: 0.18
+  lower_link_length: 0.32
