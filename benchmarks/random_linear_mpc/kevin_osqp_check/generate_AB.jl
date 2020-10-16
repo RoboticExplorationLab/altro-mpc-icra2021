@@ -12,6 +12,7 @@ function c2d(A,B,dt)
     return A_d, B_d
 end
 
+function generate_AB()
 # inertia matrix
 J = diagm([1;2;3])
 
@@ -66,4 +67,5 @@ B_analytical = [zeros(3,3);
 dt = .5;
 Ad, Bd = c2d(A_analytical,B_analytical,dt)
 
-@save "A_B_flexsat" Ad Bd
+return Ad, Bd
+# @save "A_B_flexsat" Ad Bd
