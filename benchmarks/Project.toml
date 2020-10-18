@@ -1,8 +1,11 @@
 [deps]
 Altro = "5dcf52e5-e2fb-48e0-b826-96f46d2e3e73"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Infiltrator = "5903a43b-9cc3-4c30-8d17-598619ec4e9b"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MATLAB = "10e44e05-a98a-55b3-a45b-ba969058deb6"
 OSQP = "ab2f91bb-94b4-55e3-9ba0-7f65df51de79"
 RobotDynamics = "38ceca67-d8d3-44e8-9852-78a5596522e1"
 RobotZoo = "74be38bb-dcc2-4b9e-baf3-d6373cd95f10"

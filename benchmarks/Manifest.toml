@@ -136,6 +136,12 @@ git-tree-sha1 = "c7ec02c4c6a039a98a15f955462cd7aea5df4508"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 version = "0.8.19"
 
+[[Infiltrator]]
+deps = ["REPL"]
+git-tree-sha1 = "2be5c3e8adddf062c3903a6d7618f233fa4d2874"
+uuid = "5903a43b-9cc3-4c30-8d17-598619ec4e9b"
+version = "0.3.0"
+
 [[IniFile]]
 deps = ["Test"]
 git-tree-sha1 = "098e4d2c533924c921f9f9847274f2ad89e018b8"
@@ -151,6 +157,12 @@ deps = ["AxisAlgorithms", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "
 git-tree-sha1 = "2b7d4e9be8b74f03115e64cf36ed2f48ae83d946"
 uuid = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 version = "0.12.10"
+
+[[JLD2]]
+deps = ["CodecZlib", "DataStructures", "MacroTools", "Mmap", "Pkg", "Printf", "Requires", "UUIDs"]
+git-tree-sha1 = "1b8168c14939e43c7c4d2c9e8f0ddd8718965430"
+uuid = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+version = "0.2.4"
 
 [[JLLWrappers]]
 git-tree-sha1 = "7cec881362e5b4e367ff0279dd99a06526d51a55"
@@ -188,6 +200,12 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
+
+[[MATLAB]]
+deps = ["Libdl", "SparseArrays", "Test"]
+git-tree-sha1 = "89ab46e322f9216728961119f7131038f5e4d22b"
+uuid = "10e44e05-a98a-55b3-a45b-ba969058deb6"
+version = "0.7.3"
 
 [[MacroTools]]
 deps = ["Markdown", "Random"]
@@ -249,10 +267,10 @@ uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 version = "1.3.1"
 
 [[OpenSpecFun_jll]]
-deps = ["CompilerSupportLibraries_jll", "Libdl", "Pkg"]
-git-tree-sha1 = "d51c416559217d974a1113522d5919235ae67a87"
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "9db77584158d0ab52307f8c04f8e7c08ca76b5b3"
 uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
-version = "0.5.3+3"
+version = "0.5.3+4"
 
 [[OrderedCollections]]
 git-tree-sha1 = "16c08bf5dba06609fe45e30860092d6fa41fde7b"
@@ -295,6 +313,12 @@ version = "0.4.0"
 [[RecipesBase]]
 git-tree-sha1 = "6ee6c35fe69e79e17c455a386c1ccdc66d9f7da4"
 uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+version = "1.1.0"
+
+[[Requires]]
+deps = ["UUIDs"]
+git-tree-sha1 = "28faf1c963ca1dc3ec87f166d92982e3c4a1f66d"
+uuid = "ae029012-a4dd-5104-9daa-d747884805df"
 version = "1.1.0"
 
 [[RobotDynamics]]
@@ -405,6 +429,6 @@ version = "0.9.3"
 
 [[Zlib_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "ded43825988ace7a311ee7e1d0f09571822509c4"
+git-tree-sha1 = "320228915c8debb12cb434c59057290f0834dbf6"
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.11+17"
+version = "1.2.11+18"

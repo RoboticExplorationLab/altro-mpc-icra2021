@@ -10,31 +10,44 @@ using OSQP
 using SparseArrays
 using BenchmarkTools
 
-include("random_linear.jl")
+include(joinpath(dirname(@__FILE__),"generate_AB.jl"))
 
 ##
 function gen_random_linear(n,m,N)
     # Create model
-    dt = 0.1 # doesn't matter, just needs to be non-zero
-    A,B = gendiscrete(n,m)
+    dt = 0.5 # doesn't matter, just needs to be non-zero
+    # A,B = gendiscrete(n,m)
+    A,B = generate_AB()
+    n,m = size(B)
     model = RD.LinearModel(A, B; dt=dt)
 
-    # Objective
-    Q = Diagonal(10*rand(n))
-    R = Diagonal(0.1*ones(m))
-    Qf = Q * (N-1)
+    Q = 10*I(n)
+    R = .1*I(m)
 
-    x̄ = rand(n) .+ 1
-    ū = rand(m) .+ 0.5
-    x0 = (rand(n) .- 1) .* x̄ * 0.5
+    Qf = copy(Q)
+
+    # x̄ = rand(n) .+ 1
+    ū = .01*ones(m)
+    # x0 = (rand(n) .- 1) .* x̄ * 0.5
     xf = zeros(n)
+    x0 = [.1;.1;.1;zeros(n-3)]
+
+    # Objective
+    # Q = Diagonal(10*rand(n))
+    # R = Diagonal(0.1*ones(m))
+    # Qf = Q * (N-1)
+
+    # x̄ = rand(n) .+ 1
+    # ū = rand(m) .+ 0.5
+    # x0 = (rand(n) .- 1) .* x̄ * 0.5
+    # xf = zeros(n)
     obj = LQRObjective(Q, R, Qf, xf, N)
 
     # Constraints
     constraints = ConstraintList(n, m, N)
-    bound = BoundConstraint(n, m, x_min=-x̄, x_max=x̄, u_min=-ū, u_max=ū)
+    bound = BoundConstraint(n, m, u_min=-ū, u_max=ū)
     add_constraint!(constraints, bound, 1:N-1)
-    add_constraint!(constraints, GoalConstraint(xf), N)
+    # add_constraint!(constraints, GoalConstraint(xf), N)
 
     # Problem
     tf = (N-1)*dt
@@ -77,8 +90,8 @@ function gen_OSQP_JuMP(prob::Problem)
         add_to_expression!(objective_exp, 0.5*transpose(u[select(i, m)]) * R * u[select(i, m)])
 
         # control/state bound constraints
-        @constraint(jump_model, x[select(i, n)] .<= x̄)
-        @constraint(jump_model, x[select(i, n)] .>= -x̄)
+        # @constraint(jump_model, x[select(i, n)] .<= x̄)
+        # @constraint(jump_model, x[select(i, n)] .>= -x̄)
         @constraint(jump_model, u[select(i, m)] .<= ū)
         @constraint(jump_model, u[select(i, m)] .>= -ū)
     end

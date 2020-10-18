@@ -148,7 +148,7 @@ for i = 1:mpc_iterations
 
       # ALTRO MPC start
       problem.x0 .= x0_new
-      set_options!(solver, projected_newton=false,penalty_initial = 10.0)
+      # set_options!(solver, projected_newton=false,penalty_initial = 10.0)
       solve!(solver)
       altro_times[i] = solver.stats.tsolve
 
