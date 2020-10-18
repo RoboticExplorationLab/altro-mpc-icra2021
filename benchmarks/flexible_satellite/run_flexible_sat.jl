@@ -60,6 +60,8 @@ function gen_OSQP_JuMP(prob::Problem)
     A,B = Matrix(RD.get_A(prob.model)), Matrix(RD.get_B(prob.model))
     x0 = prob.x0
     xf = prob.xf
+    @infiltrate
+    error()
     x̄ = prob.constraints[1].z_max[1:n]
     ū = prob.constraints[1].z_max[n+1:n+m]
     dt = prob.Z[1].dt
