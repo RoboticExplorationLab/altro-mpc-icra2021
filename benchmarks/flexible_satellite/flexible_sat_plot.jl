@@ -44,4 +44,4 @@ p = @pgf Axis(
     Legend("OSQP","ALTRO")
 )
 
-pgfsave("paper/figures/c_max_convergence.tikz", p, include_preamble=false)
+pgfsave(joinpath(dirname(@__FILE__),"flexible_sat_timing.tikz"), p, include_preamble=false)
