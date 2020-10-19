@@ -1,11 +1,13 @@
+import Pkg; Pkg.activate(joinpath(@__DIR__,"..")); Pkg.instantiate()
+
+
 using SparseArrays, Random
 using TrajectoryOptimization
 using Altro
-using BenchmarkTools
-using JuMP
+using Statistics
+using LinearAlgebra
 using MATLAB
 using OSQP
-using ParameterJuMP
 using RobotDynamics
 using RobotZoo
 using StaticArrays
@@ -35,28 +37,94 @@ function OSQP_postprocess_mpc(results,N,nx,nu)
       return X, U
 end
 
-Random.seed!(1234)
+function c2d(A,B,dt)
+    n = size(A,1)
+    p = size(B,2)
 
-# include(joinpath(dirname(dirname(@__FILE__)),"random_linear.jl"))
-# println("----------new run--------")
+    expAB = exp([A*dt B*dt; zeros(p,n+p)])
+
+    A_d = expAB[1:n,1:n]
+    B_d = expAB[1:n, (n+1):end ]
+
+    return A_d, B_d
+end
+
+function generate_AB()
+# inertia matrix
+J = diagm([1;2;3])
+
+# reaction wheel jacobian
+B_sc = diagm(ones(3))
+
+
+# linear momentum coupling matrix
+phi = [0 1 0;
+       1 0 0;
+       0 .2 -.8];
+
+# angular momentum coupling matrix
+delta = [0 0 1;
+         0 1 0;
+        -.7 .1 .1]
+
+# store this matrix for faster computations
+T = inv(J-delta'*delta)
+
+j = 3; # 3 modes
+
+# damping and stiffness
+zeta = [.001;.001;.001]
+Delta = [.05; .2; .125] * (2*pi)
+
+# damping and stiffness matrices
+C = zeros(j,j)
+K = zeros(j,j)
+for i =1:j
+    C[i,i] = 2*zeta[i]*Delta[i];
+    K[i,i] = Delta[i]^2;
+end
+
+
+           #   mrp        w                  n                       ndot
+pdot_row = [zeros(3,3) .25*eye(3)       zeros(3,j)                 zeros(3,j)];
+wdot_row = [zeros(3,3) zeros(3,3)     T*delta'*K                  T*delta'*C];
+ndot_row = [zeros(j,3) zeros(j,3)     zeros(j,j)                  eye(j)];
+nddot_row = [zeros(j,3) zeros(j,3) (-K - delta*T*delta'*K)    (-C - delta*T*delta'*C)];
+
+# analytical A
+A_analytical = [pdot_row;wdot_row;ndot_row;nddot_row];
+
+# analytical B
+B_analytical = [zeros(3,3);
+          -T*B_sc;
+          zeros(j,3);
+          delta*T*B_sc];
+
+# sample time
+dt = .5;
+Ad, Bd = c2d(A_analytical,B_analytical,dt)
+
+return Ad, Bd
+end
+
 
 function test_mpc()
-
-@load "A_B_flexsat" Ad Bd
+Random.seed!(1234)
+Ad, Bd = generate_AB()
 A = copy(Ad)
 B = copy(Bd)
-N = 50
+N = 80
 n,m = size(B)
 
 
-Q = Diagonal(10*rand(n))
+Q = Diagonal(10*ones(n))
 R = Diagonal(0.1*ones(m))
 
 Qf = copy(Q)
 
-# x̄ = rand(n) .+ 1
+
 ū = .01*ones(m)
-# x0 = (rand(n) .- 1) .* x̄ * 0.5
+
 xf = zeros(n)
 x0 = [.1;.1;.1;zeros(n-3)]
 dt = 0.1 # doesn't matter, just needs to be non-zero
@@ -136,15 +204,17 @@ X_osqp,U_osqp = OSQP_postprocess_mpc(results,N,nx,nu)
 
 
 
-mpc_iterations = 30
+mpc_iterations = 45
 
 osqp_times = zeros(mpc_iterations)
 altro_times = zeros(mpc_iterations)
-
+x0_new = copy(x0)
+Random.seed!(2)
 for i = 1:mpc_iterations
 
       # now we compare an MPC start
-      x0_new = x0 + .002*randn(length(x0))
+      u_new = controls(solver);u_new = u_new[1]
+      x0_new = Ad*x0_new + Bd*u_new + .0002*randn(length(x0))
 
       # ALTRO MPC start
       problem.x0 .= x0_new
@@ -176,15 +246,15 @@ end
 
 osqp_times, altro_times, X_osqp, X_altro = test_mpc()
 
+altro_times = altro_times[10:end]
+osqp_times = osqp_times[10:end]
+altro_avg = zeros(length(altro_times))
+osqp_avg = zeros(length(osqp_times))
 
-mat"
-figure
-hold on
-plot($osqp_times,'*')
-plot($altro_times,'o')
-ylabel('Solve Time (ms)')
-xlabel('Iterations')
-legend('OSQP','ALTRO')
-%ylim([0,10])
-hold off
-"
+for i = 1:length(altro_avg)
+      altro_avg[i] = mean(altro_times[max(1,i-9):i])
+      osqp_avg[i] = mean(osqp_times[max(1,i-9):i])
+end
+
+using JLD2
+@save joinpath(dirname(@__FILE__),"flexible_satellite_data.jld2") altro_times altro_avg osqp_times osqp_avg

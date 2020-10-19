@@ -94,7 +94,7 @@ function gen_OSQP(prob0::Problem, opts::SolverOptions)
     nlp = TrajOptNLP(prob, remove_bounds=true)
     NN = N*n + (N-1)*m
 
-    # Cost function 
+    # Cost function
     TO.hess_f!(nlp)
     P = nlp.data.G
     q = zeros(NN)
@@ -111,8 +111,8 @@ function gen_OSQP(prob0::Problem, opts::SolverOptions)
     l = [gL; zL]
 
     model = OSQP.Model()
-    OSQP.setup!(model, P=P, q=q, A=A, l=l, u=u; 
-        verbose=opts.verbose>0, 
+    OSQP.setup!(model, P=P, q=q, A=A, l=l, u=u;
+        verbose=opts.verbose>0,
         eps_abs=opts.cost_tolerance,
         eps_rel=opts.cost_tolerance,
         eps_prim_inf=opts.constraint_tolerance,
@@ -132,7 +132,7 @@ opts = SolverOptions(
     constraint_tolerance = 1e-4
 )
 
-## Solve with ALTRO 
+## Solve with ALTRO
 prob = gen_random_linear(12,6,11)
 solver = ALTROSolver(prob, show_summary=true)
 solve!(solver)
@@ -144,7 +144,7 @@ optimize!(jump_model)
 termination_status(jump_model)
 
 # Solve with OSQP.jl
-model,l,u = gen_OSQP(prob, opts) 
+model,l,u = gen_OSQP(prob, opts)
 results = OSQP.solve!(model)
 results.prim_inf_cert
 results.info.status
@@ -159,13 +159,13 @@ abs(results.info.obj_val - cost(solver))
 
 X_altro = vcat(Vector.(states(solver))...)
 X_jump = value.(jump_model.obj_dict[:x])
-X_osqp = results.x[xi] 
+X_osqp = results.x[xi]
 norm(X_altro - X_jump)
 norm(X_altro - X_osqp)
 
 U_altro = vcat(Vector.(controls(solver))...)
 U_jump = value.(jump_model.obj_dict[:u])
-U_osqp = results.x[ui] 
+U_osqp = results.x[ui]
 norm(U_altro - U_jump)
 norm(U_altro - U_osqp)
 
@@ -202,8 +202,8 @@ function MPC_OSQP(model, l, u, x0_l, x0_u, ICs)
     times = Float64[]
     for ic in ICs
         t = @elapsed begin
-            x0_l .= ic 
-            x0_u .= ic 
+            x0_l .= ic
+            x0_u .= ic
             OSQP.update!(model, u=u, l=l)
             results = OSQP.solve!(model)
         end
@@ -213,5 +213,5 @@ function MPC_OSQP(model, l, u, x0_l, x0_u, ICs)
 end
 ICs = gen_ICs(prob)
 set_options!(solver, show_summary = false)
-MPC_Altro(solver, ICs)
-MPC_OSQP(model, l, u, x0_l, x0_u, ICs)
+t_altro = MPC_Altro(solver, ICs)
+t_osqp = MPC_OSQP(model, l, u, x0_l, x0_u, ICs)
