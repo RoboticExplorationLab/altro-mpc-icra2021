@@ -44,6 +44,7 @@ xy_vel:
 dynamics_discretization: 0.03
 velocity_control: true
 stance_height: 0.28
+linearized_friction_constraint: true
 swing:
   omega: 100.0
   step_height: 0.05
