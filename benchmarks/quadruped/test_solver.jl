@@ -20,7 +20,7 @@ import .MPCControl
 # Closed Loop Simulation in MuJoCo:
 # Trotting in Place
 function test_solver(tf)
-    m = jlModel("woofer.xml")
+    m = jlModel("Woofer/woofer.xml")
     d = jlData(m)
 
     function get_state(d)
@@ -53,7 +53,7 @@ function test_solver(tf)
     param = MPCControl.ControllerParams(Float64, Int64)
     mpc_dt = param.mpc_update
 
-    num_samples = tf/mpc_dt + 1
+    num_samples = Integer(floor(tf/mpc_dt + 1))
     solve_times = zeros(num_samples)
     state_history = [zeros(12) for i=1:num_samples]
     time_history = zeros(num_samples)

@@ -51,8 +51,9 @@ struct OptimizerParams{T, S, L, P, A}
 
 		constraints = ConstraintList(n,m,N)
 
-		friction = FrictionConstraint(m, μ)
-		add_constraint!(constraints, friction, 1:N)
+		for i=1:4
+			add_constraint!(constraints, FrictionConstraint(m, μ, i) , 1:N-1)
+		end
 
 		u_min = @SVector [-Inf, -Inf, min_vert_force, -Inf, -Inf, min_vert_force, -Inf, -Inf, min_vert_force, -Inf, -Inf, min_vert_force]
 		u_max = @SVector [Inf, Inf, max_vert_force, Inf, Inf, max_vert_force, Inf, Inf, max_vert_force, Inf, Inf, max_vert_force]
@@ -66,7 +67,8 @@ struct OptimizerParams{T, S, L, P, A}
 		problem = Problem(model, objective, x_des, tf, x0=zeros(n), constraints=constraints, integration=RD.PassThrough)
 		solver = ALTROSolver(problem)
 		set_options!(solver, projected_newton=false, dJ_counter_limit=20)
-		set_options!(solver, reset_duals=false, penalty_scaling=10., penalty_initial=1.0)
+		set_options!(solver, reset_duals=false, penalty_scaling=10., penalty_initial=10.0)
+		set_options!(solver, constraint_tolerance=1e-4, cost_tolerance=1e-4)
 
 		solve!(solver)
 

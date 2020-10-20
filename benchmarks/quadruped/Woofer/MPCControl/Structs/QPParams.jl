@@ -33,7 +33,7 @@ function OptimizerParams(
     max_vert_force;
     n::Integer = 12,
     m::Integer = 12,
-    tol = 1e-6
+    tol = 1e-4
 ) where {T<:Number,S<:Integer}
     # initialize model and variables
     model = OSQP.Model()    

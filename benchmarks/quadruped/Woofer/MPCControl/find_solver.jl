@@ -12,8 +12,11 @@ if data["solver"] == "ALTRO"
 
 	include("Structs/FootstepLocation.jl")
 	include("Structs/ALTROParams.jl")
-	include("Structs/LinearizedFrictionConstraint.jl")
-	# include("Structs/FrictionConstraint.jl")
+	if data["linearized_friction_constraint"]
+		include("Structs/LinearizedFrictionConstraint.jl")
+	else
+		include("Structs/FrictionConstraint.jl")
+	end
 	include("Structs/SwingLegParams.jl")
 	include("Structs/GaitParams.jl")
 	include("Structs/ControllerParams.jl")
