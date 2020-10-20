@@ -9,6 +9,11 @@ using JuMP
 using OSQP
 using SparseArrays
 using BenchmarkTools
+using TimerOutputs
+using Random
+using Profile
+using ProfileView: @profview
+using StatProfilerHTML
 
 include("random_linear.jl")
 
@@ -25,7 +30,8 @@ function gen_random_linear(n,m,N)
     Qf = Q * (N-1)
 
     x̄ = rand(n) .+ 1
-    ū = rand(m) .+ 0.5
+    ū = rand(m) * 10 / (N-1)
+    # ū = rand(m) * 0.1 
     x0 = (rand(n) .- 1) .* x̄ * 0.5
     xf = zeros(n)
     obj = LQRObjective(Q, R, Qf, xf, N)
@@ -127,16 +133,92 @@ function gen_ICs(prob, iters=10)
     [(rand(n) .- 1) .* x̄ * 0.5 for i = 1:iters]
 end
 
+function MPC_Altro(solver, ICs)
+    times = Float64[]
+    iters = Int[]
+    for ic in ICs
+        t = @elapsed begin
+            TO.set_initial_state!(solver, ic)
+            solve!(solver)
+        end
+        push!(times, t)
+        push!(iters, iterations(solver))
+    end
+    println("Average iters: ", mean(iters))
+    return times
+end
+
+function MPC_OSQP(model, l, u, x0_l, x0_u, ICs)
+    times = Float64[]
+    for ic in ICs
+        t = @elapsed begin
+            x0_l .= ic 
+            x0_u .= ic 
+            OSQP.update!(model, u=u, l=l)
+            results = OSQP.solve!(model)
+        end
+        push!(times, t)
+    end
+    return times
+end
+
+function run_comparison(n,m,N,steps=100; opts=SolverOptions())
+    # Generate the problem
+    prob = gen_random_linear(n,m,N)
+
+    # Convert to OSQP
+    osqp,l,u = gen_OSQP(prob, opts) 
+    NN = N*n + (N-1)*m
+    xi = vcat([(k-1)*(n+m) .+ (1:n) for k = 1:N]...)
+    ui = vcat([(k-1)*(n+m) + n .+ (1:m) for k = 1:N-1]...)
+    x0_l = view(l, (N-1)*n .+ (1:n))
+    x0_u = view(u, (N-1)*n .+ (1:n))
+
+    # Solve the first time
+    altro = ALTROSolver(prob, opts)
+    solve!(altro)
+    res = OSQP.solve!(osqp)
+
+    # Compare the results
+    println("Difference in Cost: ", abs(results.info.obj_val - cost(altro)))
+
+    X_altro = vcat(Vector.(states(altro))...)
+    X_osqp = results.x[xi] 
+    println("Difference in states: ", norm(X_altro - X_osqp, Inf))
+
+    U_altro = vcat(Vector.(controls(altro))...)
+    U_osqp = results.x[ui] 
+    println("Difference in controls: ", norm(U_altro - U_osqp, Inf))
+
+    # Run MPC
+    ICs = gen_ICs(prob, steps)
+    set_options!(altro, reset_duals=false, penalty_initial=1e-2, penalty_scaling=100., 
+        show_summary=false, verbose=0)
+    t_altro = MPC_Altro(altro, ICs)
+    t_osqp = MPC_OSQP(osqp, l, u, x0_l, x0_u, ICs)
+    println("Median ALTRO time: ", median(t_altro))
+    println("Median OSQP time:  ", median(t_osqp))
+    # b_altro = @benchmark MPC_Altro($altro, $ICs)
+    # b_osqp = @benchmark MPC_OSQP($osqp, $l, $u, $x0_l, $x0_u, $ICs)
+    # return b_altro, b_osqp
+end
+
 opts = SolverOptions(
     cost_tolerance = 1e-4,
-    constraint_tolerance = 1e-4
+    constraint_tolerance = 1e-4,
+    projected_newton = false
 )
 
 ## Solve with ALTRO 
-prob = gen_random_linear(12,6,11)
-solver = ALTROSolver(prob, show_summary=true)
+Random.seed!(10)
+run_comparison(3,2,21)
+
+prob = gen_random_linear(12,4,101)
+solver = ALTROSolver(prob, opts, show_summary=true)
+solver.opts.reuse_jacobians = true 
+# benchmark_solve!(solver)
 solve!(solver)
-cost(solver)
+@profilehtml solve!(solver)
 
 # Solve with OSQP / JuMP
 jump_model = gen_OSQP_JuMP(prob)
@@ -173,7 +255,9 @@ norm(U_altro - U_osqp)
 ## Update initial condition
 ICs = gen_ICs(prob)
 TO.set_initial_state!(solver, ICs[1])
+set_options!(solver, reset_duals=true, penalty_initial=1e-2, penalty_scaling=100.)
 solve!(solver)
+Altro.get_ilqr(solver).x0 ≈ ICs[1]
 
 x0_l = view(l, (N-1)*n .+ (1:n))
 x0_u = view(u, (N-1)*n .+ (1:n))
@@ -182,36 +266,7 @@ x0_u .= ICs[1]
 OSQP.update!(model, u=u, l=l)
 results = OSQP.solve!(model)
 
-results.info.obj_val
 norm(states(solver)[1] - ICs[1])
 norm(results.x[1:n] - ICs[1])
 
-function MPC_Altro(solver, ICs)
-    times = Float64[]
-    for ic in ICs
-        t = @elapsed begin
-            TO.set_initial_state!(solver, ic)
-            solve!(solver)
-        end
-        push!(times, t)
-    end
-    return times
-end
-
-function MPC_OSQP(model, l, u, x0_l, x0_u, ICs)
-    times = Float64[]
-    for ic in ICs
-        t = @elapsed begin
-            x0_l .= ic 
-            x0_u .= ic 
-            OSQP.update!(model, u=u, l=l)
-            results = OSQP.solve!(model)
-        end
-        push!(times, t)
-    end
-    return times
-end
-ICs = gen_ICs(prob)
-set_options!(solver, show_summary = false)
-MPC_Altro(solver, ICs)
-MPC_OSQP(model, l, u, x0_l, x0_u, ICs)
+## Run MPC
