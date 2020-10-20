@@ -12,8 +12,11 @@ using BenchmarkTools
 using TimerOutputs
 using Random
 using Profile
-using ProfileView: @profview
+using Statistics
+# using ProfileView: @profview
 using StatProfilerHTML
+using JLD2
+using Plots
 
 include("random_linear.jl")
 
@@ -93,6 +96,9 @@ function gen_OSQP_JuMP(prob::Problem)
     return jump_model
 end
 
+"""
+Generate an OSQP problem from a TrajectoryOptimization Problem
+"""
 function gen_OSQP(prob0::Problem, opts::SolverOptions)
     prob = copy(prob0)
     TO.add_dynamics_constraints!(prob)
@@ -127,6 +133,9 @@ function gen_OSQP(prob0::Problem, opts::SolverOptions)
     return model, l,u
 end
 
+"""
+Generate a set of random initial conditions
+"""
 function gen_ICs(prob, iters=10)
     n,m,N = size(prob)
     x̄ = prob.constraints[1].z_max[1:n]
@@ -162,6 +171,13 @@ function MPC_OSQP(model, l, u, x0_l, x0_u, ICs)
     return times
 end
 
+"""
+Compare ALTRO and OSQP on a randomly-generated linear problem of the given size.
+
+Run an MPC controller that generates `steps` initial conditions and solves the problem,
+warm-starting from the previous initial condition. Reports the median times of the MPC 
+iterations.
+"""
 function run_comparison(n,m,N,steps=100; opts=SolverOptions())
     # Generate the problem
     prob = gen_random_linear(n,m,N)
@@ -180,27 +196,43 @@ function run_comparison(n,m,N,steps=100; opts=SolverOptions())
     res = OSQP.solve!(osqp)
 
     # Compare the results
-    println("Difference in Cost: ", abs(results.info.obj_val - cost(altro)))
+    # println("Difference in Cost: ", abs(res.info.obj_val - cost(altro)))
 
     X_altro = vcat(Vector.(states(altro))...)
-    X_osqp = results.x[xi] 
-    println("Difference in states: ", norm(X_altro - X_osqp, Inf))
+    X_osqp = res.x[xi] 
+    # println("Difference in states: ", norm(X_altro - X_osqp, Inf))
 
     U_altro = vcat(Vector.(controls(altro))...)
-    U_osqp = results.x[ui] 
-    println("Difference in controls: ", norm(U_altro - U_osqp, Inf))
+    U_osqp = res.x[ui] 
+    # println("Difference in controls: ", norm(U_altro - U_osqp, Inf))
+
+    # Generate the initial conditions 
+    ICs = gen_ICs(prob, steps)
+
+    # Change the ALTRO solver options for MPC
+    set_options!(altro, reset_duals=false, penalty_initial=1e-1, penalty_scaling=1000., 
+        show_summary=false, verbose=0)
 
     # Run MPC
-    ICs = gen_ICs(prob, steps)
-    set_options!(altro, reset_duals=false, penalty_initial=1e-2, penalty_scaling=100., 
-        show_summary=false, verbose=0)
     t_altro = MPC_Altro(altro, ICs)
     t_osqp = MPC_OSQP(osqp, l, u, x0_l, x0_u, ICs)
+
     println("Median ALTRO time: ", median(t_altro))
     println("Median OSQP time:  ", median(t_osqp))
-    # b_altro = @benchmark MPC_Altro($altro, $ICs)
-    # b_osqp = @benchmark MPC_OSQP($osqp, $l, $u, $x0_l, $x0_u, $ICs)
-    # return b_altro, b_osqp
+    return median(t_altro), median(t_osqp)
+end
+
+function comp_plot(xs, times_altro, times_osqp; kwargs...)
+    times_altro *= 1000
+    times_osqp *= 1000
+    avg_altro = mean.(eachrow(times_altro))
+    std_altro = std.(eachrow(times_altro))
+    avg_osqp = mean.(eachrow(times_osqp))
+    std_osqp = std.(eachrow(times_osqp))
+    p = plot(ylabel="time (ms)"; kwargs...) 
+    plot!(xs, avg_altro, yerr=std_altro, markerstrokecolor=:auto, label="ALTRO")
+    plot!(xs, avg_osqp, yerr=std_osqp, markerstrokecolor=:auto, label="OSQP")
+    return p
 end
 
 opts = SolverOptions(
@@ -209,64 +241,58 @@ opts = SolverOptions(
     projected_newton = false
 )
 
-## Solve with ALTRO 
+## Horizon Length comparison 
 Random.seed!(10)
-run_comparison(3,2,21)
+t_altro, t_osqp = run_comparison(12,4,101, 1000, opts=opts)
 
-prob = gen_random_linear(12,4,101)
-solver = ALTROSolver(prob, opts, show_summary=true)
-solver.opts.reuse_jacobians = true 
-# benchmark_solve!(solver)
-solve!(solver)
-@profilehtml solve!(solver)
+Ns = [11,21,31,41,51,101]
+n_runs = 5
+times_altro = zeros(length(Ns), n_runs)
+times_osqp = zeros(length(Ns), n_runs)
+for (i,N) in enumerate(Ns)
+    for j = 1:n_runs
+        times_altro[i,j], times_osqp[i,j] = run_comparison(12,4,N, opts=opts)
+    end
+end
+@save joinpath(@__DIR__,"horizon_comp.jld2") times_altro times_osqp
+@load joinpath(@__DIR__,"horizon_comp.jld2") times_altro times_osqp
+comp_plot(Ns, times_altro, times_osqp, xlabel="horizon length")
+savefig(joinpath(@__DIR__, "horizon_comp.png"))
 
-# Solve with OSQP / JuMP
-jump_model = gen_OSQP_JuMP(prob)
-optimize!(jump_model)
-termination_status(jump_model)
+## State Dimension
+m = 2
+ns = [2,5,10,15,20,30,40,50]
+N = 51
+n_runs = 5
+times_altro = zeros(length(ns), n_runs)
+times_osqp = zeros(length(ns), n_runs)
+for (i,n) in enumerate(ns)
+    println("Size dim $n")
+    opts.static_bp = n < 40
+    for j = 1:n_runs
+        times_altro[i,j], times_osqp[i,j] = run_comparison(n,m,N, opts=opts)
+    end
+end
+@save joinpath(@__DIR__, "state_dim_comp.jld2") times_altro times_osqp
+@load joinpath(@__DIR__, "state_dim_comp.jld2") times_altro times_osqp
+comp_plot(ns, times_altro, times_osqp, xlabel="state dimension")
+savefig(joinpath(@__DIR__, "state_dim_comp.png"))
 
-# Solve with OSQP.jl
-model,l,u = gen_OSQP(prob, opts)
-results = OSQP.solve!(model)
-results.prim_inf_cert
-results.info.status
-n,m,N = size(prob)
-NN = N*n + (N-1)*m
-xi = vcat([(k-1)*(n+m) .+ (1:n) for k = 1:N]...)
-ui = vcat([(k-1)*(n+m) + n .+ (1:m) for k = 1:N-1]...)
-
-## Check solutions
-abs(objective_value(jump_model) - cost(solver))
-abs(results.info.obj_val - cost(solver))
-
-X_altro = vcat(Vector.(states(solver))...)
-X_jump = value.(jump_model.obj_dict[:x])
-X_osqp = results.x[xi]
-norm(X_altro - X_jump)
-norm(X_altro - X_osqp)
-
-U_altro = vcat(Vector.(controls(solver))...)
-U_jump = value.(jump_model.obj_dict[:u])
-U_osqp = results.x[ui]
-norm(U_altro - U_jump)
-norm(U_altro - U_osqp)
-
-
-## Update initial condition
-ICs = gen_ICs(prob)
-TO.set_initial_state!(solver, ICs[1])
-set_options!(solver, reset_duals=true, penalty_initial=1e-2, penalty_scaling=100.)
-solve!(solver)
-Altro.get_ilqr(solver).x0 ≈ ICs[1]
-
-x0_l = view(l, (N-1)*n .+ (1:n))
-x0_u = view(u, (N-1)*n .+ (1:n))
-x0_l .= ICs[1]
-x0_u .= ICs[1]
-OSQP.update!(model, u=u, l=l)
-results = OSQP.solve!(model)
-
-norm(states(solver)[1] - ICs[1])
-norm(results.x[1:n] - ICs[1])
-
-## Run MPC
+## Control Dimension
+n = 20 
+ms = [2,5,10,15,20]
+N = 51
+n_runs = 5
+times_altro = zeros(length(ms), n_runs)
+times_osqp = zeros(length(ms), n_runs)
+for (i,m) in enumerate(ms)
+    println("Size dim $m")
+    opts.static_bp = n < 40
+    for j = 1:n_runs
+        times_altro[i,j], times_osqp[i,j] = run_comparison(n,m,N, opts=opts)
+    end
+end
+@save joinpath(@__DIR__, "control_dim_comp.jld2") times_altro times_osqp
+@load joinpath(@__DIR__, "control_dim_comp.jld2") times_altro times_osqp
+comp_plot(ms, times_altro, times_osqp, xlabel="control dimension")
+savefig(joinpath(@__DIR__, "control_dim_comp.png"))
