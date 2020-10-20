@@ -1,8 +1,8 @@
-function altro_mpc_setup(o::SquareObject, X_warm, U_warm, N, shift=0)
+function altro_mpc_setup(o::SquareObject, X_ref, U_ref, N, shift=0)
     n, m = size(o)
-    xf = X_warm[end]
+    xf = X_ref[end]
 
-    # objective
+    # Objective
     Q = 1.0e-3*Diagonal(@SVector ones(n))
     Qf = 10.0*Diagonal(@SVector ones(n))
     R = 1.0*Diagonal(@SVector ones(m))
@@ -10,9 +10,9 @@ function altro_mpc_setup(o::SquareObject, X_warm, U_warm, N, shift=0)
 
     # Update the Reference Trajectory
     for k in 1:N-1
-        TO.set_LQR_goal!(obj.cost[k], X_warm[k], U_warm[k])
+        TO.set_LQR_goal!(obj.cost[k], X_ref[k], U_ref[k])
     end
-    TO.set_LQR_goal!(obj.cost[end], X_warm[end])
+    TO.set_LQR_goal!(obj.cost[end], xf)
 
     # Create Empty ConstraintList
     conSet = ConstraintList(n,m,N)
@@ -21,6 +21,7 @@ function altro_mpc_setup(o::SquareObject, X_warm, U_warm, N, shift=0)
     goal = GoalConstraint(SVector{n}(xf))
     add_constraint!(conSet, goal, N)
 
+    # Stage Constraints
     for i = 1:N-1
         i_s = i + shift
 
@@ -53,20 +54,25 @@ function altro_mpc_setup(o::SquareObject, X_warm, U_warm, N, shift=0)
     return obj, conSet
 end
 
-function altro_mpc_update!(prob, o::SquareObject, X_warm, U_warm, N, shift)
+function altro_mpc_update!(prob, o::SquareObject, X_ref, U_ref, N, shift, X_warm, U_warm)
     n, m = size(o)
-    xf = X_warm[end]
+    xf = X_ref[end]
 
     # Update the Reference Trajectory
-    TO.set_initial_state!(prob, X_warm[1])
+    TO.set_initial_state!(prob, X_ref[1])
     for k in 1:N-1
-        TO.set_LQR_goal!(prob.obj.cost[k], X_warm[k], U_warm[k])
+        TO.set_LQR_goal!(prob.obj.cost[k], X_ref[k], U_ref[k])
     end
-    TO.set_LQR_goal!(prob.obj.cost[end], X_warm[end])
+    TO.set_LQR_goal!(prob.obj.cost[end], xf)
+
+    # Warm start
+    initial_controls!(prob, U_warm)
+    initial_states!(prob, X_warm)
 
     # Goal Constraint
     prob.constraints[1].xf .= xf
 
+    # Stage Constraints
     i_c = 2 # constraint index
     for i = 1:N-1
         i_s = i + shift # index for v an B matrices
@@ -93,9 +99,5 @@ function altro_mpc_update!(prob, o::SquareObject, X_warm, U_warm, N, shift)
         i_c += 1
     end
 
-    initial_controls!(prob, U_warm)
-    initial_states!(prob, X_warm)
-    rollout!(prob)
-    
     return
 end

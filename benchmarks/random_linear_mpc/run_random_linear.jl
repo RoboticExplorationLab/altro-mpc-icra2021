@@ -100,7 +100,7 @@ function gen_OSQP(prob0::Problem, opts::SolverOptions)
     nlp = TrajOptNLP(prob, remove_bounds=true)
     NN = N*n + (N-1)*m
 
-    # Cost function 
+    # Cost function
     TO.hess_f!(nlp)
     P = nlp.data.G
     q = zeros(NN)
@@ -117,8 +117,8 @@ function gen_OSQP(prob0::Problem, opts::SolverOptions)
     l = [gL; zL]
 
     model = OSQP.Model()
-    OSQP.setup!(model, P=P, q=q, A=A, l=l, u=u; 
-        verbose=opts.verbose>0, 
+    OSQP.setup!(model, P=P, q=q, A=A, l=l, u=u;
+        verbose=opts.verbose>0,
         eps_abs=opts.cost_tolerance,
         eps_rel=opts.cost_tolerance,
         eps_prim_inf=opts.constraint_tolerance,
@@ -226,7 +226,7 @@ optimize!(jump_model)
 termination_status(jump_model)
 
 # Solve with OSQP.jl
-model,l,u = gen_OSQP(prob, opts) 
+model,l,u = gen_OSQP(prob, opts)
 results = OSQP.solve!(model)
 results.prim_inf_cert
 results.info.status
@@ -241,13 +241,13 @@ abs(results.info.obj_val - cost(solver))
 
 X_altro = vcat(Vector.(states(solver))...)
 X_jump = value.(jump_model.obj_dict[:x])
-X_osqp = results.x[xi] 
+X_osqp = results.x[xi]
 norm(X_altro - X_jump)
 norm(X_altro - X_osqp)
 
 U_altro = vcat(Vector.(controls(solver))...)
 U_jump = value.(jump_model.obj_dict[:u])
-U_osqp = results.x[ui] 
+U_osqp = results.x[ui]
 norm(U_altro - U_jump)
 norm(U_altro - U_osqp)
 
