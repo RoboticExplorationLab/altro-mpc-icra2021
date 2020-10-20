@@ -14,27 +14,41 @@ using StaticArrays
 const RD = RobotDynamics
 
 function eye(n::Int)
-      return diagm(ones(n))
+    return diagm(ones(n))
 end
 function speye(n::Int)
-      sparse(eye(n))
+    sparse(eye(n))
+end
+function mat_from_vec(a)
+    "Turn a vector of vectors into a matrix"
+
+
+    rows = length(a[1])
+    columns = length(a)
+    A = zeros(rows,columns)
+
+    for i = 1:columns
+        A[:,i] = a[i]
+    end
+
+    return A
 end
 function OSQP_postprocess_mpc(results,N,nx,nu)
-      X = zeros(nx,N+1)
-      U = zeros(nu,N)
-      x_vec = results.x[1:(N+1)*nx]
-      u_vec = results.x[(1+(N+1)*nx):end]
-      for i = 1:N+1
-            index_first = 1 + (i-1)*nx
-            index_last = index_first + (nx-1)
-            X[:,i] = x_vec[index_first:index_last]
-      end
-      for i = 1:N
-            index_first = 1 + (i-1)*nu
-            index_last = index_first + (nu-1)
-            U[:,i] = u_vec[index_first:index_last]
-      end
-      return X, U
+    X = zeros(nx,N+1)
+    U = zeros(nu,N)
+    x_vec = results.x[1:(N+1)*nx]
+    u_vec = results.x[(1+(N+1)*nx):end]
+    for i = 1:N+1
+        index_first = 1 + (i-1)*nx
+        index_last = index_first + (nx-1)
+        X[:,i] = x_vec[index_first:index_last]
+    end
+    for i = 1:N
+        index_first = 1 + (i-1)*nu
+        index_last = index_first + (nu-1)
+        U[:,i] = u_vec[index_first:index_last]
+    end
+    return X, U
 end
 
 function c2d(A,B,dt)
@@ -50,61 +64,61 @@ function c2d(A,B,dt)
 end
 
 function generate_AB()
-# inertia matrix
-J = diagm([1;2;3])
+    # inertia matrix
+    J = diagm([1;2;3])
 
-# reaction wheel jacobian
-B_sc = diagm(ones(3))
-
-
-# linear momentum coupling matrix
-phi = [0 1 0;
-       1 0 0;
-       0 .2 -.8];
-
-# angular momentum coupling matrix
-delta = [0 0 1;
-         0 1 0;
-        -.7 .1 .1]
-
-# store this matrix for faster computations
-T = inv(J-delta'*delta)
-
-j = 3; # 3 modes
-
-# damping and stiffness
-zeta = [.001;.001;.001]
-Delta = [.05; .2; .125] * (2*pi)
-
-# damping and stiffness matrices
-C = zeros(j,j)
-K = zeros(j,j)
-for i =1:j
-    C[i,i] = 2*zeta[i]*Delta[i];
-    K[i,i] = Delta[i]^2;
-end
+    # reaction wheel jacobian
+    B_sc = diagm(ones(3))
 
 
-           #   mrp        w                  n                       ndot
-pdot_row = [zeros(3,3) .25*eye(3)       zeros(3,j)                 zeros(3,j)];
-wdot_row = [zeros(3,3) zeros(3,3)     T*delta'*K                  T*delta'*C];
-ndot_row = [zeros(j,3) zeros(j,3)     zeros(j,j)                  eye(j)];
-nddot_row = [zeros(j,3) zeros(j,3) (-K - delta*T*delta'*K)    (-C - delta*T*delta'*C)];
+    # linear momentum coupling matrix
+    phi = [0 1 0;
+           1 0 0;
+           0 .2 -.8];
 
-# analytical A
-A_analytical = [pdot_row;wdot_row;ndot_row;nddot_row];
+    # angular momentum coupling matrix
+    delta = [0 0 1;
+             0 1 0;
+            -.7 .1 .1]
 
-# analytical B
-B_analytical = [zeros(3,3);
-          -T*B_sc;
-          zeros(j,3);
-          delta*T*B_sc];
+    # store this matrix for faster computations
+    T = inv(J-delta'*delta)
 
-# sample time
-dt = .5;
-Ad, Bd = c2d(A_analytical,B_analytical,dt)
+    j = 3; # 3 modes
 
-return Ad, Bd
+    # damping and stiffness
+    zeta = [.001;.001;.001]
+    Delta = [.05; .2; .125] * (2*pi)
+
+    # damping and stiffness matrices
+    C = zeros(j,j)
+    K = zeros(j,j)
+    for i =1:j
+        C[i,i] = 2*zeta[i]*Delta[i];
+        K[i,i] = Delta[i]^2;
+    end
+
+
+               #   mrp        w                  n                       ndot
+    pdot_row = [zeros(3,3) .25*eye(3)       zeros(3,j)                 zeros(3,j)];
+    wdot_row = [zeros(3,3) zeros(3,3)     T*delta'*K                  T*delta'*C];
+    ndot_row = [zeros(j,3) zeros(j,3)     zeros(j,j)                  eye(j)];
+    nddot_row = [zeros(j,3) zeros(j,3) (-K - delta*T*delta'*K)    (-C - delta*T*delta'*C)];
+
+    # analytical A
+    A_analytical = [pdot_row;wdot_row;ndot_row;nddot_row];
+
+    # analytical B
+    B_analytical = [zeros(3,3);
+              -T*B_sc;
+              zeros(j,3);
+              delta*T*B_sc];
+
+    # sample time
+    dt = .5;
+    Ad, Bd = c2d(A_analytical,B_analytical,dt)
+
+    return Ad, Bd
 end
 
 
@@ -153,7 +167,7 @@ U_altro = controls(solver)
 
 
 
-println("OSQP part 2")
+println("OSQP")
 
 #
 N = N-1
@@ -201,7 +215,21 @@ results = OSQP.solve!(m)
 
 X_osqp,U_osqp = OSQP_postprocess_mpc(results,N,nx,nu)
 
-
+# mat"
+# figure
+# hold on
+# plot($X_osqp')
+# hold off"
+#
+# X_altro = mat_from_vec(X_altro)
+# mat"
+# figure
+# hold on
+# plot($X_altro')
+# hold off"
+#
+# @infiltrate
+# error()
 
 
 mpc_iterations = 45
@@ -243,18 +271,44 @@ X_osqp,U_osqp = OSQP_postprocess_mpc(results,N,nx,nu)
 return osqp_times, altro_times, X_osqp, states(solver)
 end
 
+sim_trials = 10
+osqp_time_mat = zeros(45,sim_trials)
+altro_time_mat = zeros(45,sim_trials)
 
-osqp_times, altro_times, X_osqp, X_altro = test_mpc()
-
-altro_times = altro_times[10:end]
-osqp_times = osqp_times[10:end]
-altro_avg = zeros(length(altro_times))
-osqp_avg = zeros(length(osqp_times))
-
-for i = 1:length(altro_avg)
-      altro_avg[i] = mean(altro_times[max(1,i-9):i])
-      osqp_avg[i] = mean(osqp_times[max(1,i-9):i])
+for i = 1:sim_trials
+    osqp_times, altro_times, X_osqp, X_altro = test_mpc()
+    altro_times = altro_times[1:end]
+    osqp_times = osqp_times[1:end]
+    altro_time_mat[:,i] = altro_times
+    osqp_time_mat[:,i] = osqp_times
 end
 
-using JLD2
-@save joinpath(dirname(@__FILE__),"flexible_satellite_data.jld2") altro_times altro_avg osqp_times osqp_avg
+# altro_avg = zeros(length(altro_times))
+# osqp_avg = zeros(length(osqp_times))
+#
+# for i = 1:length(altro_avg)
+#       altro_avg[i] = mean(altro_times[max(1,i-9):i])
+#       osqp_avg[i] = mean(osqp_times[max(1,i-9):i])
+# end
+
+
+function comp_plot(xs, times_altro, times_osqp; kwargs...)
+    times_altro *= 1000
+    times_osqp *= 1000
+    avg_altro = mean.(eachrow(times_altro))
+    std_altro = std.(eachrow(times_altro))
+    avg_osqp = mean.(eachrow(times_osqp))
+    std_osqp = std.(eachrow(times_osqp))
+    p = plot(ylabel="time (ms)"; kwargs...)
+    plot!(xs, avg_altro, yerr=std_altro, markerstrokecolor=:auto, label="ALTRO")
+    plot!(xs, avg_osqp, yerr=std_osqp, markerstrokecolor=:auto, label="OSQP")
+    return p
+end
+
+comp_plot(1:45, altro_time_mat, osqp_time_mat, xlabel="MPC Steps")
+#
+
+
+
+# using JLD2
+# @save joinpath(dirname(@__FILE__),"flexible_satellite_data.jld2") altro_times altro_avg osqp_times osqp_avg
