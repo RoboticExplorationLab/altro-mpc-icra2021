@@ -2,10 +2,6 @@
 
 using LinearAlgebra
 
-# Select between solvers
-@enum SOLVER_TYPE USE_ALTRO=1 USE_CONVEX=2
-@enum WARMCOLD WARM=1 COLD=2
-
 """
     get_umax(grav, num_gs)
 
@@ -16,9 +12,21 @@ function get_umax(grav, num_gs)
 end
 
 """
-    getAngle3D(u)
+    getAlpha(theta, deg = true)
 
 Helper function for max thrust angle constraint.
+"""
+function getAlpha(theta, deg = true)
+    if deg
+        return tand(theta)
+    end
+    return tan(theta)
+end
+
+"""
+    getAngle3D(u)
+
+Helper function for plotting max thrust angle constraint.
 """
 function getAngle3D(u)
     if norm(u[3]) == 0.0

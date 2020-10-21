@@ -3,8 +3,37 @@ This file defines the key structs to ensure that ALTRO.jl and Convex.jl are
 indeed solving the same problem
 =#
 
-using LinearAlgebra, SparseArrays
+using LinearAlgebra, SparseArrays, StaticArrays
 include("utils.jl")
+
+# Select between solvers
+@enum SOLVER_TYPE USE_ALTRO=1 USE_CONVEX=2
+@enum WARMCOLD WARM=1 COLD=2
+
+
+"""
+    selection
+
+Convenient struct that holds the user selection in solver.
+"""
+struct selection
+    st::SOLVER_TYPE
+    wc::WARMCOLD
+end
+
+"""
+    output_options
+
+Convenient struct that holds the printing and plotting options.
+"""
+struct OutputOptions
+    save_data::Bool
+    plot_during::Bool
+    verbose::Bool
+    benchmark_per_solve::Bool
+    benchmark_per_outer_loop::Bool
+end
+
 
 """
     TrajectoryOptions
@@ -17,6 +46,18 @@ struct TrajectoryOptions
     dt::Float64
     x0
     xf
+end
+
+"""
+    ObjectiveOptions
+
+Convenient stuct that holds the necessary constants pertinent to the objective
+itself (specifically for LQR-like objectives).
+"""
+struct ObjectiveOptions
+    Qk::Float64
+    Qfk::Float64
+    Rk::Float64
 end
 
 
@@ -62,7 +103,7 @@ end
 
 Simplified Constructor for Rocket Struct.
 
-Omega is the rotational velocity of the planet / moon.
+Theta is in degrees. Omega is the rotational velocity of the planet / moon.
 """
 function Rocket(mass::Float64, grav, theta, u_max,
                         dt = 1, omega = [0.0; 0.0; 0.0]; isp = 0.0)
@@ -73,6 +114,8 @@ function Rocket(mass::Float64, grav, theta, u_max,
          -S(omega)^2    -2*S(omega)]
     B = [zeros(3,3);    -(1/mass) * I]
     G = [zeros(3,1);    grav]
+
+    display(A)
 
     # Form as a single large matrix
     rows = size(A, 1)
@@ -89,7 +132,7 @@ function Rocket(mass::Float64, grav, theta, u_max,
     Gd = sparse(discrete_mat[1:rowsA, colsA + colsB + 1:end])
 
     # We assume 3 controls and 6 states, otherwise the above does not hold.
-    return Rocket(A, B, G, Ad, Bd, Gd, mass, grav, isp, 3, 6, theta, u_max)
+    return Rocket(A, B, vec(G), Ad, Bd, Gd, mass, grav, isp, 3, 6, theta, u_max)
 end
 
 """
@@ -105,16 +148,4 @@ end
 function get_traj_size(r::Rocket, t_opt::TrajectoryOptions)
     # Last step does not have a control
     return t_opt.N * (r.num_controls + r.num_states) + r.num_states
-end
-
-"""
-    ObjectiveOptions
-
-Convenient stuct that holds the necessary constants pertinent to the objective
-itself (specifically for LQR-like objectives).
-"""
-struct ObjectiveOptions
-    Qk
-    Qfk
-    Rk
 end
