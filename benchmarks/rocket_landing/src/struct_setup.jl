@@ -68,32 +68,50 @@ function Rocket(mass::Float64, grav, theta, u_max,
                         dt = 1, omega = [0.0; 0.0; 0.0]; isp = 0.0)
 
     # Write the Dynamics in Continuous Form
+    # Alternatively, we could include gravity with u (and hence B)
     A = [zeros(3,3)     I;
          -S(omega)^2    -2*S(omega)]
     B = [zeros(3,3);    -(1/mass) * I]
     G = [zeros(3,1);    grav]
 
+    # Form as a single large matrix
     rows = size(A, 1)
     cols = size(A, 2) + size(B, 2) + size(G, 2)
     ABG_tot = [A B G; zeros((cols - rows), cols)]
 
+    # Exponentiate the Matrix and convert to discrete
     discrete_mat = exp(ABG_tot * dt)
-    rowsA, colsA, colsB = size(A, 1), size(A, 2), size(B, 2)
-    # colsA = size(aMat, 2)
-    # colsB = size(bMat, 2)
 
+    # Extract Discrete Matrices
+    rowsA, colsA, colsB = size(A, 1), size(A, 2), size(B, 2)
     Ad = sparse(discrete_mat[1:rowsA, 1:colsA])
     Bd = sparse(discrete_mat[1:rowsA, colsA + 1:colsA + colsB])
     Gd = sparse(discrete_mat[1:rowsA, colsA + colsB + 1:end])
 
+    # We assume 3 controls and 6 states, otherwise the above does not hold.
     return Rocket(A, B, G, Ad, Bd, Gd, mass, grav, isp, 3, 6, theta, u_max)
+end
+
+"""
+    propogate_dynamics(r::Rocket, state, controls, disturbance = zeros(6, 1))
+
+Propogate the system forward by one time step.
+"""
+function propogate_dynamics(r::Rocket, state, controls,
+                                disturbance = zeros(6, 1))
+    return r.Adis * state + r.Bdis * controls + r.Gdis + disturbance
+end
+
+function get_traj_size(r::Rocket, t_opt::TrajectoryOptions)
+    # Last step does not have a control
+    return t_opt.N * (r.num_controls + r.num_states) + r.num_states
 end
 
 """
     ObjectiveOptions
 
 Convenient stuct that holds the necessary constants pertinent to the objective
-itself.
+itself (specifically for LQR-like objectives).
 """
 struct ObjectiveOptions
     Qk

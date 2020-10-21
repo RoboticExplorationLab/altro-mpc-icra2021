@@ -2,6 +2,10 @@
 
 using LinearAlgebra
 
+# Select between solvers
+@enum SOLVER_TYPE USE_ALTRO=1 USE_CONVEX=2
+@enum WARMCOLD WARM=1 COLD=2
+
 """
     get_umax(grav, num_gs)
 
