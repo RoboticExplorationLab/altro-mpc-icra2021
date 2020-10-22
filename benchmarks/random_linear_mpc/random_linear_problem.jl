@@ -127,7 +127,7 @@ function run_MPC(prob_mpc, opts_mpc, Z_track, num_iters=length(Z_track) - prob_m
     osqp,l,u = gen_OSQP(prob_mpc, opts_mpc)
 
     # Some initialization
-    N_mpc = prob_mpc.N
+    n,m,N_mpc = size(prob_mpc) 
     xinds = [(k-1)*(n+m) .+ (1:n) for k = 1:N_mpc]
     uinds = [(k-1)*(n+m) + n .+ (1:m) for k = 1:N_mpc-1]
     xi = vcat(xinds...)
