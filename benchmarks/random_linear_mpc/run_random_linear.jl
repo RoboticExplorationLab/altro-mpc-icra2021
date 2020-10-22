@@ -20,6 +20,7 @@ using StatProfilerHTML
 using JLD2
 using Plots
 
+include("../plotting.jl")
 include("random_linear.jl")
 include("random_linear_problem.jl")
 
@@ -78,65 +79,30 @@ end
 @save "horizon_comp.jld2" results Ns
 @load "horizon_comp.jld2" results Ns
 
-using PGFPlotsX
-function PGFBoxPlot(x, y::Real=0, thresh=3*std(x); opts=(@pgf {}), plot_outliers=true)
-    q1,q2,q3 = quantile(x,[0.25, 0.5, 0.75])
-    μ = mean(x)
-    is_inlier = μ - thresh .< abs.(x) .< μ + thresh
-    inliers = x[is_inlier]
-    outliers = x[.!is_inlier] 
-    lo = minimum(inliers)
-    up = maximum(inliers)
-    if plot_outliers
-        coords = Coordinates(fill(y,length(outliers)), outliers)
-    else
-        coords = Coordinates([],[])
-    end
-        
-    @pgf PlotInc(
-        {
-            opts...,
-            "solid",
-            "very thick",
-            "forget plot",
-            "boxplot prepared" = {
-                "draw direction"="y",
-                "draw position"=y,
-                "lower whisker"=lo,
-                "lower quartile"=q1,
-                "median"=q2,
-                "upper quartile"=q3,
-                "upper whisker"=up, 
-                "box extend"=6,
-            },
-            "mark options"={scale=.5}
-        }, 
-        coords
-    )
-end
 altro_avg = [mean(res[:time][:,1]) for res in results] 
 osqp_avg = [mean(res[:time][:,2]) for res in results] 
 
 shift = 4 
 altro = map(zip(Ns,results)) do (N,res)
     times = res[:time][:,1]
-    PGFBoxPlot(times, N-shift, plot_outliers=false, opts=@pgf {"red"})
+    PGFBoxPlot(times, N-shift, plot_outliers=false, opts=@pgf {color=colors.altro})
 end
 osqp = map(zip(Ns,results)) do (N,res)
     times = res[:time][:,2]
-    PGFBoxPlot(times, N+shift, plot_outliers=false, opts=@pgf {"blue"})
+    PGFBoxPlot(times, N+shift, plot_outliers=false, opts=@pgf {color=colors.osqp})
 end
 p = @pgf TikzPicture(
     Axis(
     {
         width="8in",
         grid="both",
-        xlabel="Knot Points (N)"
+        xlabel="knot points (N)",
+        ylabel="computation time (s)"
     },
     altro...,
     osqp...,
-    PlotInc({"red","dashed","no marks"}, Coordinates(Ns .- shift, altro_avg)),
-    PlotInc({"blue","dashed","no marks"}, Coordinates(Ns .+ shift, osqp_avg)),
+    PlotInc({"red","dashed","no marks", "very thick"}, Coordinates(Ns .- shift, altro_avg)),
+    PlotInc({"blue","dashed","no marks", "very thick"}, Coordinates(Ns .+ shift, osqp_avg)),
     Legend("ALTRO","OSQP")
 ))
 print_tex(p)
