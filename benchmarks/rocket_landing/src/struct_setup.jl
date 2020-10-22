@@ -34,19 +34,48 @@ struct OutputOptions
     benchmark_per_outer_loop::Bool
 end
 
-
 """
     TrajectoryOptions
 
 Convenient struct that holds the necessary constants pertinent to the
 trajectory and its discretization.
 """
-struct TrajectoryOptions
+abstract type TrajectoryOptions end
+
+"""
+    TrajectoryOptionsCOLD
+
+TrajectoryOptions for Cold Start Cases.
+"""
+struct TrajectoryOptionsCOLD <: TrajectoryOptions
     N::Int64
     dt::Float64
     x0
     xf
 end
+
+"""
+    TrajectoryOptionsWARM
+
+TrajectoryOptions for Warm Start Cases.
+"""
+struct TrajectoryOptionsWARM <: TrajectoryOptions
+    Horizon::Int64
+    N::Int64
+    dt::Float64
+    x0
+    xf
+    ref_traj_x
+    ref_traj_u
+end
+
+get_tf(t_opt::TrajectoryOptions) = t_opt.N * t_opt.dt
+get_tf_horizon(t_opt::TrajectoryOptionsWARM) = t_opt.Horizon * t_opt.dt
+
+convertToWARM(t_COLD::TrajectoryOptions, Horizon, ref_traj_x, ref_traj_u) =
+                            TrajectoryOptionsWARM(Horizon, t_COLD.N, t_COLD.dt,
+                                t_COLD.x0, t_COLD.xf, ref_traj_x, ref_traj_u)
+
 
 """
     ObjectiveOptions
@@ -105,8 +134,8 @@ Simplified Constructor for Rocket Struct.
 
 Theta is in degrees. Omega is the rotational velocity of the planet / moon.
 """
-function Rocket(mass::Float64, grav, theta, u_max,
-                        dt = 1, omega = [0.0; 0.0; 0.0]; isp = 0.0)
+function Rocket(mass::Float64, grav, theta, dt = 1, omega = [0.0; 0.0; 0.0];
+                                isp = 0.0, perWeightMax = 2)
 
     # Write the Dynamics in Continuous Form
     # Alternatively, we could include gravity with u (and hence B)
@@ -114,8 +143,6 @@ function Rocket(mass::Float64, grav, theta, u_max,
          -S(omega)^2    -2*S(omega)]
     B = [zeros(3,3);    -(1/mass) * I]
     G = [zeros(3,1);    grav]
-
-    display(A)
 
     # Form as a single large matrix
     rows = size(A, 1)
@@ -130,6 +157,8 @@ function Rocket(mass::Float64, grav, theta, u_max,
     Ad = sparse(discrete_mat[1:rowsA, 1:colsA])
     Bd = sparse(discrete_mat[1:rowsA, colsA + 1:colsA + colsB])
     Gd = sparse(discrete_mat[1:rowsA, colsA + colsB + 1:end])
+
+    u_max = mass * grav[3] * perWeightMax
 
     # We assume 3 controls and 6 states, otherwise the above does not hold.
     return Rocket(A, B, vec(G), Ad, Bd, Gd, mass, grav, isp, 3, 6, theta, u_max)
