@@ -77,7 +77,7 @@ rollout!(prob);
 using Altro
 # for example 2, solves in 50 ms
 opts = SolverOptions(
-    verbose = 1,
+    verbose = 0,
     projected_newton_tolerance=1e-5,
     cost_tolerance_intermediate=1e-5,
     penalty_scaling=10.,
@@ -109,52 +109,59 @@ zd = [X[t][6] for t = 1:N]
 F1 = [U[t][2:3] for t = 1:N-1]
 F2 = [U[t][5:6] for t = 1:N-1]
 
-# gif of trajectory
-anim = Animation()
-for t = 1:N-1
-    global F1, F2, y, z, model, θ
-    local p, F
-    p = [o.p[1][t][2:3], o.p[2][t][2:3]]
-    F = [F1[t], F2[t]]
-    plot([])
-    visualize_square([y[t],z[t]], θ[t], p, F, o.mass*o.g[2:3], r=1)
-    frame(anim)
-end
-gif(anim, string(@__DIR__,"/altro_3D_w_rotation$ex.gif"), fps=2)
+# Save Results
+using JLD2
+o_p = o.p
+o_mass = o.mass
+o_g = o.g
+@save string(@__DIR__,"/grasp_ref_traj.jld2") y z F1 F2 θ o_p o_mass o_g
 
 # static version of gif
 plot([])
 for t = 1:2:N-1
-    global F1, F2, y, z, model, θ
+    global y, z, F1, F2, o_p, θ
     local p, F
-    p = [o.p[1][t][2:3], o.p[2][t][2:3]]
+    p = [o_p[1][t][2:3], o_p[2][t][2:3]]
     F = [F1[t], F2[t]]
-    visualize_square([y[t],z[t]], θ[t], p, F, o.mass*o.g[2:3], fa=t/(N-1))
+    visualize_square([y[t],z[t]], θ[t], p, F, o_mass*o_g[2:3], fa=t/(N-1))
 end
-title!("Gravity in green, Gripper forces in red")
+plot!([])
 
-# plot of state vector trajectory
-plot([x y z xd yd zd],
-    xlabel="Time Step",
-    ylabel="Coordinate",
-    label = ["x" "y" "z" "xd" "yd" "zd"])
+# # gif of trajectory
+# anim = Animation()
+# for t = 1:N-1
+#     global F1, F2, y, z, model, θ
+#     local p, F
+#     p = [o.p[1][t][2:3], o.p[2][t][2:3]]
+#     F = [F1[t], F2[t]]
+#     plot([])
+#     visualize_square([y[t],z[t]], θ[t], p, F, o.mass*o.g[2:3], r=1)
+#     frame(anim)
+# end
+# gif(anim, string(@__DIR__,"/altro_3D_w_rotation$ex.gif"), fps=2)
 
-# plot of normal forces
-normal1 = [dot(o.v[1][i], U[i][1:3]) for i = 1:N-1]
-normal2 = [dot(o.v[2][i], U[i][4:6]) for i = 1:N-1]
-plot([normal1 normal2 o.f*ones(N-1)],
-    xlabel="Time Step",
-    ylabel="Normal Force",
-    linestyle = [:solid :solid :dash],
-    label = ["F_N1" "F_N1" "Max Grasping Force"])
-
-# plot of tangential to normal force ratio
-tangent1 = [norm((I - o.v[1][i]*o.v[1][i]')*U[i][1:3]) for i = 1:N-1]
-tangent2 = [norm((I - o.v[2][i]*o.v[2][i]')*U[i][4:6]) for i = 1:N-1]
-friction1 = tangent1 ./ normal1
-friction2 = tangent2 ./ normal2
-plot([friction1 friction2 o.mu*ones(N-1)],
-    xlabel="Time Step",
-    ylabel="Tangential Force/Normal Force",
-    linestyle = [:solid :solid :dash],
-    label = ["F_T1/F_N1" "F_T2/F_N2" "mu"])
+# # plot of state vector trajectory
+# plot([x y z xd yd zd],
+#     xlabel="Time Step",
+#     ylabel="Coordinate",
+#     label = ["x" "y" "z" "xd" "yd" "zd"])
+#
+# # plot of normal forces
+# normal1 = [dot(o.v[1][i], U[i][1:3]) for i = 1:N-1]
+# normal2 = [dot(o.v[2][i], U[i][4:6]) for i = 1:N-1]
+# plot([normal1 normal2 o.f*ones(N-1)],
+#     xlabel="Time Step",
+#     ylabel="Normal Force",
+#     linestyle = [:solid :solid :dash],
+#     label = ["F_N1" "F_N1" "Max Grasping Force"])
+#
+# # plot of tangential to normal force ratio
+# tangent1 = [norm((I - o.v[1][i]*o.v[1][i]')*U[i][1:3]) for i = 1:N-1]
+# tangent2 = [norm((I - o.v[2][i]*o.v[2][i]')*U[i][4:6]) for i = 1:N-1]
+# friction1 = tangent1 ./ normal1
+# friction2 = tangent2 ./ normal2
+# plot([friction1 friction2 o.mu*ones(N-1)],
+#     xlabel="Time Step",
+#     ylabel="Tangential Force/Normal Force",
+#     linestyle = [:solid :solid :dash],
+#     label = ["F_T1/F_N1" "F_T2/F_N2" "mu"])

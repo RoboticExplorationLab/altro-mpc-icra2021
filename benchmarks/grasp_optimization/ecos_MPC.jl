@@ -73,11 +73,11 @@ ecos_controls = []
 push!(ecos_states, x_curr)
 
 for iter in 1:num_iters
-    global x_curr, u_curr, X_warm, U_warm
+    global x_curr, u_curr, X_warm, U_warm, noise
     local prob, Z, F1, F2
 
     # Propagate the physics forward to the next timestep
-    x_curr = noisy_discrete_dynamics(o, x_curr, u_curr, dt)
+    x_curr = noisy_discrete_dynamics(o, x_curr, u_curr, dt, noise[iter])
 
     # Set trajectory to track
     X_ref = [x_curr X_cold[:, iter .+ (2:hor)]]

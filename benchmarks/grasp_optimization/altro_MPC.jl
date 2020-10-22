@@ -110,10 +110,10 @@ altro_controls = []
 push!(altro_states, x_curr)
 
 for iter in 1:num_iters
-    global x_curr, u_curr, prob, altro, opts, X_warm, U_warm
+    global x_curr, u_curr, prob, altro, opts, X_warm, U_warm, noise
 
     # Propagate the physics forward to the next timestep
-    x_curr = noisy_discrete_dynamics(o, x_curr, u_curr, dt)
+    x_curr = noisy_discrete_dynamics(o, x_curr, u_curr, dt, noise[iter])
 
     # Set trajectory to track
     X_ref = [[x_curr]; X_cold[iter .+ (2:hor)]]

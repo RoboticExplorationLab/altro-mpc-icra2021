@@ -19,6 +19,8 @@ c = compute_rot_traj_coeffs(t0, tf, [θ0; θf; θd0; θdf])
 # generate p v B matrices
 p1_0 = [.0,1, 0]; v1_0 = [.0,-1, 0]
 p2_0 = [.0,-1, 0]; v2_0 = [.0,1, 0]
+p2_0 = [.0,1, 0]; v2_0 = [.0,-1, 0]
+p1_0 = [.0,-1, 0]; v1_0 = [.0,1, 0]
 p1, v1, B1 = generate_pvB_3D(p1_0, v1_0, θ)
 p2, v2, B2 = generate_pvB_3D(p2_0, v2_0, θ)
 
