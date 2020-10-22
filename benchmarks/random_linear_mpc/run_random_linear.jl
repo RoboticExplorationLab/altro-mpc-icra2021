@@ -1,4 +1,5 @@
 import Pkg; Pkg.activate(joinpath(@__DIR__,"..")); Pkg.instantiate()
+
 using Altro
 using TrajectoryOptimization
 using RobotDynamics
@@ -15,6 +16,7 @@ using Profile
 using Statistics
 using LinearAlgebra
 using StaticArrays
+using StatsPlots
 # using ProfileView: @profview
 using StatProfilerHTML
 using JLD2
@@ -53,6 +55,7 @@ Z_track = prob.Z
 Random.seed!(10)
 
 ## Generate the (tracking) MPC problem
+N_mpc = 21
 prob_mpc = gen_tracking_problem(prob, N_mpc)
 
 ## Run MPC
@@ -65,7 +68,6 @@ opts = SolverOptions(
     reset_duals = false,
     projected_newton = false
 )
-N_mpc = 21
 Random.seed!(1)
 res = run_MPC(prob_mpc, opts, Z_track)
 res[:time]
@@ -73,6 +75,7 @@ res[:time]
 norm(res[:err_x0],Inf)
 norm(res[:err_traj],Inf)
 res[:err_traj]
+
 
 ## Time Horizon
 Ns = [11,31,51,71,101]
