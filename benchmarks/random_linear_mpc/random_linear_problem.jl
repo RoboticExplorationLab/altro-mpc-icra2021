@@ -119,7 +119,7 @@ Run the MPC problem to track `Z_track`
 
 Compares the OSQP and ALTRO solutions and timing results
 """
-function run_MPC(prob_mpc, opts_mpc, Z_track)
+function run_MPC(prob_mpc, opts_mpc, Z_track, num_iters=length(Z_track) - prob_mpc.N)
     # Generate ALTRO solver
     altro = ALTROSolver(prob_mpc, opts_mpc)
 
@@ -141,7 +141,6 @@ function run_MPC(prob_mpc, opts_mpc, Z_track)
     k_mpc = 1
     obj = prob_mpc.obj
 
-    num_iters = length(Z_track) - prob_mpc.N
     err_traj = zeros(num_iters,2)
     err_x0 = zeros(num_iters,2)
     iters = zeros(Int, num_iters,2)
