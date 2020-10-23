@@ -3,6 +3,7 @@
 include("utils.jl")
 include("struct_setup.jl")
 include("make_problem_ALTRO.jl")
+include("make_problem_Convex.jl")
 
 
 
