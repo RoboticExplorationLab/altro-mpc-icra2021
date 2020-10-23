@@ -2,6 +2,13 @@ function altro_mpc_setup(o::SquareObject, X_ref, U_ref, N, shift=0)
     n, m = size(o)
     xf = X_ref[end]
 
+    # Indices for convenience
+    pos_ind = 1:Int(n/2)
+    vel_ind = 1+Int(n/2):n
+    u_ind = n .+ (1:m)
+    F1_ind = n .+ (1:Int(m/2))
+    F2_ind = n .+ (1+Int(m/2):m)
+
     # Objective
     Q = 1.0e-3*Diagonal(@SVector ones(n))
     Qf = 10.0*Diagonal(@SVector ones(n))
