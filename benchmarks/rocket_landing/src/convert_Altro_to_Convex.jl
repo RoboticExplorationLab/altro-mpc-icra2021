@@ -122,7 +122,7 @@ function gen_ECOS(prob_altro::TrajectoryOptimization.Problem,
     if setStates
         X_altro = states(prob_copy)
         # [set_value!(X[:, k], X_altro[k]) for k in 1:N]
-        set_value!(X, hcat(X_altro...))
+        set_value!(X, hcat(Vector.(X_altro)...))
         if verbose
             println("Reference State Trajectory Set")
         end
