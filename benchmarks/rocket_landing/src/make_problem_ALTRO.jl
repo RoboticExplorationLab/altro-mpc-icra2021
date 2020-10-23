@@ -67,13 +67,14 @@ function make_problem_ALTRO_COLD(r::Rocket, obj_opts::ObjectiveOptions,
 
     # Package the objective and constraints into a "problem" type
     tf = (t_opts.N-1) * t_opts.dt
-    prob = Problem(model, obj, t_opts.xf, tf, x0=t_opts.x0, constraints=conSet)
+    prob = TrajectoryOptimization.Problem(model, obj, t_opts.xf, tf,
+                                            x0=t_opts.x0, constraints=conSet)
     if out_opts.verbose
         println("Problem Made with tf = $tf")
     end
 
     # Set the initial controls to a hover
-    u0 = r.grav # controls that would nominally hover
+    u0 = r.mass * r.grav # controls that would nominally hover
     U0 = [u0 for k = 1:t_opts.N-1] # vector of the small controls
     initial_controls!(prob, U0)
     rollout!(prob)
