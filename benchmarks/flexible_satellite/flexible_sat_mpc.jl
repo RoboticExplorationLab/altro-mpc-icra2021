@@ -123,7 +123,7 @@ end
 
 
 function test_mpc()
-Random.seed!(1234)
+# Random.seed!(1234)
 Ad, Bd = generate_AB()
 A = copy(Ad)
 B = copy(Bd)
@@ -237,7 +237,7 @@ mpc_iterations = 45
 osqp_times = zeros(mpc_iterations)
 altro_times = zeros(mpc_iterations)
 x0_new = copy(x0)
-Random.seed!(2)
+# Random.seed!(2)
 for i = 1:mpc_iterations
 
       # now we compare an MPC start
@@ -277,12 +277,132 @@ altro_time_mat = zeros(45,sim_trials)
 
 for i = 1:sim_trials
     osqp_times, altro_times, X_osqp, X_altro = test_mpc()
-    altro_times = altro_times[1:end]
-    osqp_times = osqp_times[1:end]
+    altro_times = altro_times[11:end]
+    osqp_times = osqp_times[11:end]
     altro_time_mat[:,i] = altro_times
     osqp_time_mat[:,i] = osqp_times
 end
 
+
+osqp_quants = zeros(size(osqp_time_mat,1),3)
+lo = zeros(size(osqp_time_mat,1))
+up = zeros(size(osqp_time_mat,1))
+osqp_med = zeros(size(osqp_time_mat,1))
+altro_med = zeros(size(osqp_time_mat,1))
+for i = 1:size(osqp_time_mat,1)
+    # osqp_quants[i,1],osqp_quants[i,2],osqp_quants[i,3] =
+    # quantile(osqp_time_mat[i,:],[0.25 0.5 0.75])
+    # lo[i] = minimum(osqp_time_mat[i,:])
+    # up[i] = maximum(osqp_time_mat[i,:])
+    osqp_med[i] = median(osqp_time_mat[i,:])
+    altro_med[i] = median(altro_time_mat[i,:])
+end
+
+function vec_from_mat(mat)
+    #vector of vectors from matrix of column vectors
+
+    s = size(mat)
+    if length(s) == 3
+        a,b,c = size(mat)
+
+        V = fill(zeros(a,b),c)
+
+        for i = 1:c
+            V[i] = mat[:,:,i]
+        end
+    else
+        a,b = size(mat)
+
+        V = fill(zeros(a),b)
+
+        for i = 1:b
+            V[i] = mat[:,i]
+        end
+    end
+
+
+    return V
+end
+
+# q1 = osqp_quants[:,1]
+# q2 = osqp_quants[:,2]
+# q3 = osqp_quants[:,3]
+# coords = Coordinates([],[])
+# opts=(@pgf {})
+# y = 0
+width = 1
+
+Q = vec_from_mat(osqp_time_mat')
+A = vec_from_mat(altro_time_mat')
+idx_range = 1:4:45
+Ns = 1:1:45
+osqp = map(zip(Ns[idx_range],Q[idx_range])) do (N,q)
+    PGFBoxPlot(q,N,2*std(q);width=width,opts=@pgf {color=colors.osqp})
+end
+altro = map(zip(Ns[idx_range],A[idx_range])) do (N,a)
+    PGFBoxPlot(a,N,2*std(a);width=width,opts=@pgf {color=colors.altro})
+end
+xlabel = "MPC Steps"
+# ymode = "linear"
+ymode = "log"
+
+p = @pgf TikzPicture(
+        Axis(
+        {
+            # width="8in",
+            "ymajorgrids",
+            "xmajorgrids",
+            xlabel=xlabel,
+            ymode=ymode,
+            ylabel="computation time (ms)",
+            xtick=Ns,
+            "legend style"={
+                at={"(0.1,0.9)"},
+                anchor="north west"
+            }
+        },
+        altro...,
+        osqp...,
+        PlotInc({"red","dashed","no marks", "very thick"}, Coordinates(Ns, altro_med)),
+        PlotInc({"blue","dashed","no marks", "very thick"}, Coordinates(Ns, osqp_med)),
+        Legend("ALTRO","OSQP")
+    ))
+
+print("ya")
+
+mat"
+figure
+hold on
+plot($altro_time_mat,'r')
+plot($osqp_time_mat,'b')
+hold off
+"
+
+mat"
+figure
+hold on
+boxplot($altro_time_mat')
+hold off
+"
+# p =@pgf PlotInc(
+#     {
+#         opts...,
+#         "solid",
+#         "line width"="2pt",
+#         "forget plot",
+#         "boxplot prepared" = {
+#             "draw direction"="y",
+#             "draw position"=y,
+#             "lower whisker"=lo,
+#             "lower quartile"=q1,
+#             "median"=q2,
+#             "upper quartile"=q3,
+#             "upper whisker"=up,
+#             "box extend"=width,
+#         },
+#         "mark options"={scale=.5},
+#     }
+# )
 # altro_avg = zeros(length(altro_times))
 # osqp_avg = zeros(length(osqp_times))
 #
@@ -292,20 +412,20 @@ end
 # end
 
 
-function comp_plot(xs, times_altro, times_osqp; kwargs...)
-    times_altro *= 1000
-    times_osqp *= 1000
-    avg_altro = mean.(eachrow(times_altro))
-    std_altro = std.(eachrow(times_altro))
-    avg_osqp = mean.(eachrow(times_osqp))
-    std_osqp = std.(eachrow(times_osqp))
-    p = plot(ylabel="time (ms)"; kwargs...)
-    plot!(xs, avg_altro, yerr=std_altro, markerstrokecolor=:auto, label="ALTRO")
-    plot!(xs, avg_osqp, yerr=std_osqp, markerstrokecolor=:auto, label="OSQP")
-    return p
-end
-
-comp_plot(1:45, altro_time_mat, osqp_time_mat, xlabel="MPC Steps")
+# function comp_plot(xs, times_altro, times_osqp; kwargs...)
+#     times_altro *= 1000
+#     times_osqp *= 1000
+#     avg_altro = mean.(eachrow(times_altro))
+#     std_altro = std.(eachrow(times_altro))
+#     avg_osqp = mean.(eachrow(times_osqp))
+#     std_osqp = std.(eachrow(times_osqp))
+#     p = plot(ylabel="time (ms)"; kwargs...)
+#     plot!(xs, avg_altro, yerr=std_altro, markerstrokecolor=:auto, label="ALTRO")
+#     plot!(xs, avg_osqp, yerr=std_osqp, markerstrokecolor=:auto, label="OSQP")
+#     return p
+# end
+#
+# comp_plot(1:45, altro_time_mat, osqp_time_mat, xlabel="MPC Steps")
 #
 
 
