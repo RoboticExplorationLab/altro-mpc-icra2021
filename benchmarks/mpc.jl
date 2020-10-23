@@ -18,9 +18,10 @@ function gen_tracking_problem(prob::Problem, N;
     xf = state(Z[N])  # this actually doesn't effect anything
 
     # Generate a cost that tracks the trajectory
-    Q = Diagonal(@SVector fill(10.0, n))
-    R = Diagonal(@SVector fill(.1, m))
-    obj = TO.TrackingObjective(Q, R, Z) 
+    Q = Diagonal(@SVector fill(Qk, n))
+    R = Diagonal(@SVector fill(Rk, m))
+    Qf = Diagonal(@SVector fill(Qfk, n))
+    obj = TO.TrackingObjective(Q, R, Z, Qf=Qf) 
 
     # Use the same constraints, except the Goal constraint
     cons = ConstraintList(n,m,N)

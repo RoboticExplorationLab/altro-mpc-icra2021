@@ -14,7 +14,7 @@ struct NormConstraint2{S,D,p,q} <: TrajectoryOptimization.StageConstraint
     c::SVector{p, Float64}
     sense::S
     inds::SVector{D,Int}
-    function NormConstraint2(n::Int, m::Int, A::SizedMatrix, c::SVector,
+    function NormConstraint2(n::Int, m::Int, A::StaticMatrix, c::StaticVector,
                                 sense::TrajectoryOptimization.ConstraintSense,
                                 inds = SVector{m}(1:m))
         if inds == :control

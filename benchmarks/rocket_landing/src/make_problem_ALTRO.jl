@@ -66,9 +66,8 @@ function make_problem_ALTRO_COLD(r::Rocket, obj_opts::ObjectiveOptions,
     end
 
     # Package the objective and constraints into a "problem" type
-    tf = t_opts.N * t_opts.dt
-    prob = TrajectoryOptimization.Problem(model, obj, t_opts.xf, tf,
-                                            x0=t_opts.x0, constraints=conSet)
+    tf = (t_opts.N-1) * t_opts.dt
+    prob = Problem(model, obj, t_opts.xf, tf, x0=t_opts.x0, constraints=conSet)
     if out_opts.verbose
         println("Problem Made with tf = $tf")
     end
