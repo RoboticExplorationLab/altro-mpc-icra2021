@@ -38,7 +38,7 @@ Convert ALTRO problem to Convex (ECOS). Note that ALTRO -> ECOS is fairly
 straight forward, but ECOS -> ALTRO is non trivial (depending on how the
 ECOS constraints are written).
 """
-function gen_ECOS(prob_altro::TrajectoryOptimization.Problem,
+function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
                         opts::SolverOptions{Float64}; verbose::Bool = false,
                         setStates::Bool = true, setControls::Bool = true,
                         track::Bool = true)
@@ -52,9 +52,10 @@ function gen_ECOS(prob_altro::TrajectoryOptimization.Problem,
 
     # First we recreate the cost function
 
+    # Initialize decision variables
     n, m, N = size(prob_altro)
-    X = Variable(n, N) # State Trajectory
-    U = Variable(m, N - 1) # State Trajectory
+    X = Variable(n, N)       # State Trajectory
+    U = Variable(m, N - 1)   # Control Trajectory
     dt = prob_copy.Z[1].dt
 
     # First, we build the cost function.
@@ -104,15 +105,12 @@ function gen_ECOS(prob_altro::TrajectoryOptimization.Problem,
 
     # Including the initial conditions
     push!(constraints, X[:,1] == prob_copy.x0)
-
-    if verbose
-        println("Dynamics Constraint Set")
-    end
+    verbose && println("Dynamics Constraint Set")
 
     # Second up is the goal constraint
-    push!(constraints, X[:, end] == prob_copy.xf)
-    if verbose
-        println("Goal Constraint Set")
+    if any(x->x isa GoalConstraint, prob_copy.constraints)
+        push!(constraints, X[:, end] == prob_copy.xf)
+        verbose && println("Goal Constraint Set")
     end
 
     # Third up is the ground constraint
@@ -120,20 +118,14 @@ function gen_ECOS(prob_altro::TrajectoryOptimization.Problem,
                                         BoundConstraint{1,n + m,Float64})
     ground_level = prob_copy.constraints[inds[1]].z_min[3]
     push!(constraints, X[3, :] >= ground_level)
-
-    if verbose
-        println("Ground Constraint Set")
-    end
+    verbose && println("Ground Constraint Set")
 
     # Fourth up is the max thrust constraint
     inds = get_constraint_from_type(prob_copy.constraints,
             NormConstraint{TrajectoryOptimization.SecondOrderCone,m,Float64})
     u_max = prob_copy.constraints[inds[1]].val
     [push!(constraints, norm(U[:,i]) <= u_max) for i in N - 1]
-
-    if verbose
-        println("Max Thrust Constraint Set")
-    end
+    verbose && println("Max Thrust Constraint Set")
 
     # Fifth up is the max thrust angle constraint
     inds = get_constraint_from_type(prob_copy.constraints,
@@ -141,9 +133,7 @@ function gen_ECOS(prob_altro::TrajectoryOptimization.Problem,
     maxTAalpha = prob_copy.constraints[inds[1]].c[3]
     [push!(constraints, norm(U[1:2, i]) <= maxTAalpha * U[3, i]) for i in N - 1]
 
-    if verbose
-        println("Max Thrust Angle Constraint Set")
-    end
+    verbose && println("Max Thrust Angle Constraint Set")
 
     # Now we are done with the constraints!
 

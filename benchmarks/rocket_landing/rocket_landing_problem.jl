@@ -161,7 +161,7 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
     altro = ALTROSolver(prob_mpc, opts_mpc)
 
     # To match the altro problem, we can derive it from the altro
-    ecos = gen_ECOS(prob_mpc, opts_mpc)
+    ecos = gen_ECOS_Rocket(prob_mpc, opts_mpc)
 
     # Solve initial iteration
     Altro.solve!(altro)
