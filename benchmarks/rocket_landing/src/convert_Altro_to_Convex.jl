@@ -57,7 +57,7 @@ function gen_ECOS(prob_altro::TrajectoryOptimization.Problem,
 
     # First up are the dynamics constraints
     if RobotDynamics.is_discrete(prob_copy.model)
-        if typeof(prob_copy.model) == LinearizedModel
+        if isa(prob_copy.model, LinearizedModel)
             mod = prob_copy.model.linmodel
         else
             mod = prob_copy.model

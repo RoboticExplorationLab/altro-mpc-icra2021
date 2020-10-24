@@ -6,8 +6,10 @@ using RobotDynamics
 const RD = RobotDynamics
 const TO = TrajectoryOptimization
 
-using JuMP
-using OSQP
+# using JuMP
+# using OSQP
+using Convex
+using ECOS
 using SparseArrays
 using BenchmarkTools
 using TimerOutputs
@@ -22,6 +24,11 @@ using StatProfilerHTML
 using JLD2
 using Plots
 include("rocket_landing_problem.jl")
+include("src\\struct_setup.jl")
+include("src\\make_problem.jl")
+include("src\\convert_Altro_to_Convex.jl")
+
+
 
 ##
 x0_new = @SVector [4.0, 2.0, 20.0, -3.0, 2.0, -5.0]
@@ -30,10 +37,11 @@ N = 301
 dt = 0.05
 theta = 20
 
-r1 = Rocket(10.0, [0; 0; 9.81], 20, t1.dt)
+r1 = Rocket(10.0, [0; 0; 9.81], 20, dt)
 s1 = selection(USE_ALTRO, COLD)
 obj1 = ObjectiveOptions(1e-2, 100.0, 1e-1)
 out1 = OutputOptions(true, true, true, true, true)
+t1 = TrajectoryOptionsCOLD(N,dt, x0_new, xf_new)
 
 prob = RocketProblem(N, (N-1)*dt, x0=x0_new, θ_max=theta, integration=RK3)
 prob0 = make_problem_ALTRO_COLD(r1, obj1, t1, out1)
@@ -59,7 +67,7 @@ opts = SolverOptions(
 )
 prob = RocketProblem(N, (N-1)*dt, x0=x0_new, θ_max=theta, integration=Exponential)
 solver = ALTROSolver(prob, opts, show_summary=true)
-solve!(solver)
+Altro.solve!(solver)
 
 ##
 Random.seed!(1)
@@ -72,7 +80,7 @@ opts_mpc = SolverOptions(
     penalty_scaling = 100.,
     verbose = 0,
     reset_duals = false,
-    show_summary = false 
+    show_summary = false
 )
 N_mpc = 51
 prob_mpc = RocketProblemMPC(prob, N_mpc,
