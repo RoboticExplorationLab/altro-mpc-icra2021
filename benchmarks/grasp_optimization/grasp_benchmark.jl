@@ -1,35 +1,38 @@
-using Pkg
-Pkg.activate(@__DIR__)
-Pkg.instantiate()
+import Pkg; Pkg.activate(joinpath(@__DIR__,"..")); Pkg.instantiate()
 
-# Run MPC
-noise = [.03*randn(6) for i=1:20] # use the same dynamics noise for both runs
-include("altro_MPC.jl") # generates altro_times, altro_states, altro_controls
-include("ecos_MPC.jl") # generates ecos_times, ecos_states, ecos_controls
+using BenchmarkTools
+using Convex, ECOS
+using TrajectoryOptimization, Altro
+const TO = TrajectoryOptimization
+using RobotDynamics
+const RD = RobotDynamics
 
-# Verify Matching Trajectories
-for i=1:num_iters
-    print("Timestep $i: ")
-    print("\tState diff = ", round(norm(altro_states[i+1] - ecos_states[i+1]), digits=2))
-    println("\tControl diff = ", round(norm(altro_controls[i] - ecos_controls[i]), digits=2))
-end
+# Setup Benchmark
+include("grasp_mpc.jl")
+
+# Run Benchmark
+println("Starting MPC Benchmark:")
+altro_traj, altro_res, ecos_times = run_grasp_mpc(prob_mpc, opts, Z_track)
 
 # Solve Time Difference
+altro_times = altro_res[:time]
 ave_diff = (sum(ecos_times) - sum(altro_times))/length(altro_times)
 println("\n Average ALTRO solve time was $(round(ave_diff, digits=2)) ms faster than that of ECOS")
 
-# Save Results
-using JLD2
-@save string(@__DIR__,"/grasp_benchmark_data.jld2") altro_times altro_states altro_controls ecos_times ecos_states ecos_controls
+## Uncomment to save results
 
-# Plot Timing Results
-using Plots
-bounds = extrema([altro_times; ecos_times])
-bin_min = floor(Int, bounds[1]) - 1
-bin_max = ceil(Int, bounds[2]) + 1
-bins = collect(bin_min:2:bin_max)
-histogram(altro_times, bins=bins, fillalpha=.5, label="ALTRO")
-histogram!(ecos_times, bins=bins, fillalpha=.5, label="ECOS")
-xlabel!("Solve Time (ms)")
-ylabel!("Counts")
-png(string(@__DIR__,"/grasp_hist.png"))
+# # Save Results
+# using JLD2
+# @save string(@__DIR__,"/grasp_benchmark_data.jld2") altro_times ecos_times
+#
+# # Plot Timing Results
+# using Plots
+# bounds = extrema([altro_times; ecos_times])
+# bin_min = floor(Int, bounds[1]) - 1
+# bin_max = ceil(Int, bounds[2]) + 1
+# bins = collect(bin_min:bin_max)
+# histogram(altro_times, bins=bins, fillalpha=.5, label="ALTRO")
+# histogram!(ecos_times, bins=bins, fillalpha=.5, label="ECOS")
+# xlabel!("Solve Time (ms)")
+# ylabel!("Counts")
+# png(string(@__DIR__,"/grasp_benchmark_hist.png"))
