@@ -51,9 +51,9 @@ Altro.solve!(solver)
 ## Set up MPC problem
 Random.seed!(1)
 opts_mpc = SolverOptions(
-    cost_tolerance = 1e-4,
-    cost_tolerance_intermediate = 1e-4,
-    constraint_tolerance = 1e-4,
+    cost_tolerance = 1e-8,
+    cost_tolerance_intermediate = 1e-8,
+    constraint_tolerance = 1e-8,
     projected_newton = false,
     penalty_initial = 10.,
     penalty_scaling = 100.,
@@ -69,15 +69,23 @@ prob_mpc = RocketProblemMPC(prob, N_mpc,
     Rk = 1e-1,
 )
 
-prob_mpc.x0
 Z_track = prob.Z
-X, res = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track)
+X, X_ecos, U_ecos, res = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track)
 
 println("Mean Time       = $(mean(res[:time],dims=1)[1])")
 println("Mean Iterations = $(mean(res[:iter],dims=1)[1])")
-println("Mean Traj Error = $(mean(res[:err_traj],dims=1)[1])")
-println("Mean X0 Error   = $(mean(res[:err_x0],dims=1)[1])")
+println("Mean State Error = $(mean(res[:err_traj],dims=1)[1])")
+println("Mean Control Error = $(mean(res[:err_traj],dims=1)[2])")
+println("Mean X0 Error   = $(mean(res[:err_x0],dims=1)[2])")
 
+model = prob_mpc.model
+X = SVector{6}.(eachcol(evaluate(X_ecos)))
+U = SVector{3}.(eachcol(evaluate(U_ecos)))
+Xprime = [discrete_dynamics(PassThrough, model, X[i], U[i], 0, dt) for i = 1:N_mpc-1]
+norm(Xprime - X[2:end],Inf)
+
+##
 using Plots
 plot(X, inds=1:3)
 plot!(states(Z_track), inds=1:3, color=[1 2 3], linestyle=:dash)
+
