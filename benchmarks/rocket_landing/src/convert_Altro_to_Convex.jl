@@ -41,8 +41,8 @@ ECOS constraints are written).
 returns (1) the ecos problem, (2) the state trajectory variable, and
 (3) the control trajectory variable
 """
-function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem, 
-                        Z_track=prob_altro.Z, 
+function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
+                        Z_track=prob_altro.Z,
                         k_track=1;
                         verbose::Bool = false,
                         setStates::Bool = true,
@@ -158,7 +158,8 @@ function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
     inds = get_constraint_from_type(prob_copy.constraints,
             NormConstraint2{TrajectoryOptimization.SecondOrderCone,m,m,m})
     maxTAalpha = prob_copy.constraints[inds[1]].c[3]
-    [push!(constraints, norm(U[1:2, i]) <= maxTAalpha * U[3, i]) for i in 1:N - 1]
+    [push!(constraints, norm(U[1:2, i]) <= maxTAalpha * U[3, i])
+                                                            for i in 1:N - 1]
 
     verbose && println("Max Thrust Angle Constraint Set")
 
