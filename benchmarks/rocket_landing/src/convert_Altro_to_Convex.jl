@@ -37,11 +37,16 @@ end
 Convert ALTRO problem to Convex (ECOS). Note that ALTRO -> ECOS is fairly
 straight forward, but ECOS -> ALTRO is non trivial (depending on how the
 ECOS constraints are written).
+
+returns (1) the ecos problem, (2) the state trajectory variable, and
+(3) the control trajectory variable
 """
-function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
-                        opts::SolverOptions{Float64}; verbose::Bool = false,
-                        setStates::Bool = true, setControls::Bool = true,
-                        track::Bool = true)
+function gen_ECOS(prob_altro::TrajectoryOptimization.Problem;
+                        verbose::Bool = false,
+                        setStates::Bool = true,
+                        setControls::Bool = true,
+                        track::Bool = true,
+                        includeGoal::Bool = false)
 
     # Copy the problem to prevent overwritting it
     prob_copy = copy(prob_altro)
@@ -136,6 +141,7 @@ function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
     verbose && println("Max Thrust Angle Constraint Set")
 
     # Now we are done with the constraints!
+    prob_ecos.constraints += constraints
 
 
     # Lastly, we set the initial states and controls
@@ -154,7 +160,7 @@ function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
     end
 
 
-    return prob_ecos
+    return prob_ecos, X, U
 
 
 end

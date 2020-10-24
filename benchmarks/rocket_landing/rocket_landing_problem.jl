@@ -161,7 +161,7 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
     altro = ALTROSolver(prob_mpc, opts_mpc)
 
     # To match the altro problem, we can derive it from the altro
-    ecos = gen_ECOS_Rocket(prob_mpc, opts_mpc)
+    ecos, X_ecos, U_ecos = gen_ECOS(prob_mpc, verbose = true)
 
     # Solve initial iteration
     Altro.solve!(altro)
@@ -199,6 +199,10 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         # Shift the multipliers and penalties
         Altro.shift_fill!(TO.get_constraints(altro))
 
+        # Again, to insure they are solving the same problem, we get regenerate
+        # the ECOS problem
+        ecos, X_ecos, U_ecos = gen_ECOS(prob_mpc)
+
         # Solve the updated problem
         Altro.solve!(altro)
         Convex.solve!(ecos, ECOS.Optimizer(verbose = 0, feastol=1e-4,
@@ -211,6 +215,22 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         # times[i,2] = res.info.solve_time * 1000
 
         # compare the solutions....
+        # Grab the X and U trajectories from ALTRO
+        X_altro = getX_toECOS(get_trajectory(altro))
+        U_altro = getU_toECOS(get_trajectory(altro))
+        # Grab the X and U trajectories from ECOS
+        X_ecos_eval = evaluate(X_ecos)
+        U_ecos_eval = evaluate(U_ecos)
+
+        # Use the infinity norm to determine the maximum violation between the
+        # two trajectories
+        err_traj[i,1] = norm(X_altro - X_ecos_eval, Inf)
+        err_traj[i,2] = norm(U_altro - U_ecos_eval, Inf)
+
+        # Get the Euclidean norm beteen the initial states.
+        err_x0[i,1] = norm(X_altro[:,1] - x0)
+        err_x0[i,2] = norm(X_ecos_eval[:,1] - x0)
+
     end
     return X_traj, Dict(:time=>times, :iter=>iters,
                                 :err_traj=>err_traj, :err_x0=>err_x0)

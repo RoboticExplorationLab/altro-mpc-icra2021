@@ -61,17 +61,22 @@ opts_mpc = SolverOptions(
     reset_duals = false,
     show_summary = false
 )
+
 N_mpc = 51
 prob_mpc = RocketProblemMPC(prob, N_mpc,
     Qk = 10.,
     Qfk = 100.0,
     Rk = 1e-1,
 )
+
 prob_mpc.x0
 Z_track = prob.Z
 X, res = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track)
-mean(res[:time],dims=1)[1]
-mean(res[:iter],dims=1)[1]
+
+println("Mean Time       = $(mean(res[:time],dims=1)[1])")
+println("Mean Iterations = $(mean(res[:iter],dims=1)[1])")
+println("Mean Traj Error = $(mean(res[:err_traj],dims=1)[1])")
+println("Mean X0 Error   = $(mean(res[:err_x0],dims=1)[1])")
 
 using Plots
 plot(X, inds=1:3)
