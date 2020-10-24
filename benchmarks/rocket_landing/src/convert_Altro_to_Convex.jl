@@ -41,7 +41,7 @@ ECOS constraints are written).
 returns (1) the ecos problem, (2) the state trajectory variable, and
 (3) the control trajectory variable
 """
-function gen_ECOS(prob_altro::TrajectoryOptimization.Problem;
+function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem;
                         verbose::Bool = false,
                         setStates::Bool = true,
                         setControls::Bool = true,
@@ -122,7 +122,7 @@ function gen_ECOS(prob_altro::TrajectoryOptimization.Problem;
     inds = get_constraint_from_type(prob_copy.constraints,
                                         BoundConstraint{1,n + m,Float64})
     ground_level = prob_copy.constraints[inds[1]].z_min[3]
-    push!(constraints, X[3, :] >= ground_level)
+    [push!(constraints, X[3, :] >= ground_level) for i in N - 1]
     verbose && println("Ground Constraint Set")
 
     # Fourth up is the max thrust constraint
