@@ -13,6 +13,22 @@ function get_constraint_from_type(cList, this_type)
     return findall([typeof(c) == this_type for c in cList])
 end
 
+function getX_toECOS(Z::Traj)
+    return hcat(Vector.(states(Z))...)
+end
+
+function getX_toECOS(prob::TO.Problem)
+    return getX_toECOS(prob.Z)
+end
+
+function getU_toECOS(Z::Traj)
+    return hcat([vcat(u...) for u in controls(Z)]...)
+end
+
+function getU_toECOS(prob::TO.Problem)
+    return getU_toECOS(prob.Z)
+end
+
 
 
 """
@@ -24,7 +40,8 @@ ECOS constraints are written).
 """
 function gen_ECOS(prob_altro::TrajectoryOptimization.Problem,
                         opts::SolverOptions{Float64}; verbose::Bool = false,
-                        setStates::Bool = true, setControls::Bool = true)
+                        setStates::Bool = true, setControls::Bool = true,
+                        track::Bool = true)
 
     # Copy the problem to prevent overwritting it
     prob_copy = copy(prob_altro)
@@ -40,13 +57,26 @@ function gen_ECOS(prob_altro::TrajectoryOptimization.Problem,
     U = Variable(m, N - 1) # State Trajectory
     dt = prob_copy.Z[1].dt
 
+    # First, we build the cost function.
+    # Qk, Rk, and Qfk are the Diagonal coefficients of the objective.
     Qk = prob_copy.obj[1].Q[1]
     Rk = prob_copy.obj[1].R[1]
     Qfk = prob_copy.obj[end].Q[1]
 
-    # First, we build the cost function.
-    objective = Qk * sumsquares(X[:,1:N-1]) + Qfk * sumsquares(X[:,N]) +
+    if track
+        # We make a cost the penalizes deviations from a reference trajectory
+        XTrack = getX_toECOS(prob_altro)
+        UTrack = getU_toECOS(prob_altro)
+
+        objective = Qk * sumsquares(X[:,1:N-1] - XTrack[:,1:N-1]) +
+                        Qfk * sumsquares(X[:,N] - XTrack[:,N]) +
+                        Rk * sumsquares(U - UTrack)
+    else
+        objective = Qk * sumsquares(X[:,1:N-1]) +
+                        Qfk * sumsquares(X[:,N]) +
                         Rk * sumsquares(U)
+    end
+
     prob_ecos = minimize(objective)
 
     if verbose
@@ -115,22 +145,19 @@ function gen_ECOS(prob_altro::TrajectoryOptimization.Problem,
         println("Max Thrust Angle Constraint Set")
     end
 
-    # Now we are done with the constraints
+    # Now we are done with the constraints!
 
 
     # Lastly, we set the initial states and controls
     if setStates
-        X_altro = states(prob_copy)
-        # [set_value!(X[:, k], X_altro[k]) for k in 1:N]
-        set_value!(X, hcat(Vector.(X_altro)...))
+        set_value!(X, getX_toECOS(prob_copy))
         if verbose
             println("Reference State Trajectory Set")
         end
     end
 
     if setControls
-        U_altro = controls(prob_copy)
-        set_value!(U, hcat([vcat(u...) for u in U_altro]...))
+        set_value!(U, getU_toECOS(prob_copy))
         if verbose
             println("Reference Control Trajectory Set")
         end

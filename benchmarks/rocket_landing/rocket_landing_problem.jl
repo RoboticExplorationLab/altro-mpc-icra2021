@@ -201,7 +201,8 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
 
         # Solve the updated problem
         Altro.solve!(altro)
-        Convex.solve!(ecos, ECOS.Optimizer)
+        Convex.solve!(ecos, ECOS.Optimizer(verbose = 0, feastol=1e-4,
+                                            abstol=1e-4, reltol=1e-4))
 
         iters[i,1] = iterations(altro)
         # iters[i,2] = res.info.iter
