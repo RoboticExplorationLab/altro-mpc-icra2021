@@ -195,6 +195,13 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         x0 = discrete_dynamics(TO.integration(prob_mpc),
                                     prob_mpc.model, prob_mpc.Z[1])
         x0 += (@SVector randn(n)) * norm(x0,Inf) / 100  # 1% noise
+        x0_NoGround = [x for x in [x0[1:2]..., max(x0[3], 0.0), x0[4:6]...]]
+        println("Iter $i : $(x0[1:3])")
+
+        if x0 != x0_NoGround
+            println("Iter $i : x0 = $x0 && x0_NoGround = $x0_NoGround")
+        end
+
         TO.set_initial_state!(prob_mpc, x0)
         X_traj[i+1] = x0
 
@@ -233,6 +240,8 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         # two trajectories
         err_traj[i,1] = norm(X_altro - X_ecos_eval, Inf)
         err_traj[i,2] = norm(U_altro - U_ecos_eval, Inf)
+
+        println("State Error = $(err_traj[i,1])")
 
         # Get the Euclidean norm beteen the initial states.
         err_x0[i,1] = norm(X_altro[:,1] - x0)
