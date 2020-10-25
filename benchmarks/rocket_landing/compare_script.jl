@@ -39,7 +39,8 @@ x0_new = @SVector [4.0, 2.0, 20.0, -3.0, 2.0, -5.0]
 xf_new = @SVector zeros(6)
 N = 301
 dt = 0.05
-theta = 20
+theta = 20 # deg
+glide = 50 # deg
 
 opts = SolverOptions(
     cost_tolerance_intermediate=1e-2,
@@ -49,8 +50,11 @@ opts = SolverOptions(
     projected_newton = false,
     constraint_tolerance = 1.0e-8,
 )
-prob_altro_cold = RocketProblem(N, (N-1)*dt, x0=x0_new, θ_max=theta,
-                            integration=Exponential)
+prob_altro_cold = RocketProblem(N, (N-1)*dt,
+                                        x0=x0_new,
+                                        θ_thrust_max=theta,
+                                        θ_glidescope=glide,
+                                        integration=Exponential)
 
 solver = ALTROSolver(prob_altro_cold, opts, show_summary=true)
 Altro.solve!(solver)
@@ -61,7 +65,7 @@ ys_altro = getArrAtInd(X_altro, 2)
 zs_altro = getArrAtInd(X_altro, 3)
 
 plt_altro3d = plot3d(xs_altro, ys_altro, zs_altro, label = "ALTRO Trajectory")
-
+display(plt_altro3d)
 
 Random.seed!(1)
 opts_mpc = SolverOptions(
@@ -111,3 +115,5 @@ plot_3set(controls(altro_mpc), U_ecos,
 # Show error in position with reference trajectory
 plot_3setRef(states(altro_mpc), X_ecos, states(Z_track)[1:N_mpc],
                         title = "Position between ALTRO and ECOS")
+
+plot_glide_angle(states(altro_mpc), X_ecos, states(Z_track))

@@ -38,7 +38,7 @@ function RocketModel(mass, grav, dt, ωPlanet = [0.0; 0.0; 0.0];
     model = LinearizedModel(cmodel, dt=dt, is_affine=true, integration=integration)
 end
 
-getalpha(θ, deg=true) = deg ? tan(θ) : tand(θ)
+getalpha(θ, deg=true) = deg ? tand(θ) : tan(θ)
 
 function RocketProblem(N=101, tf=10.0;
         x0 = SA_F64[4, 2, 20, -3, 2, -5],
@@ -50,7 +50,8 @@ function RocketProblem(N=101, tf=10.0;
         mass = 10.0,
         ωPlanet = [0.0; 0.0; 0.0],
         perWeightMax = 2.0,
-        θ_max = 7.0,  # deg
+        θ_thrust_max = 7.0,  # deg
+        θ_glidescope = 60.0, # deg
         include_goal = true,
         integration=RD.Exponential
     )
@@ -94,8 +95,8 @@ function RocketProblem(N=101, tf=10.0;
     This prevents trajectories that go in the ground. This is sufficient for
     flat locals, such as oceans, but not more complex locations.
     =#
-    x_min = SA[-Inf, -Inf, ground_level, -Inf, -Inf, -Inf]
-    TO.add_constraint!(cons, BoundConstraint(n,m, x_min = x_min), 2:N-1)
+    # x_min = SA[-Inf, -Inf, ground_level, -Inf, -Inf, -Inf]
+    # TO.add_constraint!(cons, BoundConstraint(n,m, x_min = x_min), 2:N-1)
 
     # Max Thrust
     #=
@@ -122,7 +123,7 @@ function RocketProblem(N=101, tf=10.0;
     We write this as || [u_x; u_y] || ≤ tan(θ) u_z
     To write this in the SOCP form of ||Ax|| ≤ c'x, we take the A and c below.
     =#
-    α_max = getalpha(θ_max)
+    α_max = getalpha(θ_thrust_max)
     ARocket = SA_F64[
         1 0 0;
         0 1 0;
@@ -132,6 +133,37 @@ function RocketProblem(N=101, tf=10.0;
     maxAngle = NormConstraint2(n, m, ARocket, cRocket,
                                     TO.SecondOrderCone(), :control)
     TO.add_constraint!(cons, maxAngle, 1:N-1)
+
+
+    # Glidescope Constraint
+    #=
+    This prevents trajectories that drifts near the surface (which is a safety
+    risk). As we make the that angle larger, the constraint is more lenient.
+    The angle cannot be larger than 90 deg.
+    =#
+    α_glide = getalpha(θ_glidescope)
+    AGlide = SA_F64[
+        1 0 0 0 0 0;
+        0 1 0 0 0 0;
+        0 0 0 0 0 0;
+        0 0 0 0 0 0;
+        0 0 0 0 0 0;
+        0 0 0 0 0 0
+    ]
+    cGlide = SA_F64[0, 0, α_glide, 0, 0, 0]
+    glidescope = NormConstraint2(n, m, AGlide, cGlide,
+                                    TO.SecondOrderCone(), :state)
+    TO.add_constraint!(cons, glidescope, 1:N-1)
+    # α_glide = cosd(θ_glidescope)
+    # AGlide = SA_F64[
+    #     1 0 0;
+    #     0 1 0;
+    #     0 0 1
+    # ]
+    # cGlide = SA_F64[0, 0, 1/α_glide]
+    # glidescope = NormConstraint2(n, m, AGlide, cGlide,
+    #                                 TO.SecondOrderCone(), :control)
+    # TO.add_constraint!(cons, glidescope, 1:N-1)
 
     """
     Problem

@@ -141,18 +141,18 @@ function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
     end
 
     # Third up is the ground constraint
-    inds = get_constraint_from_type(prob_copy.constraints,
-                                        BoundConstraint{1,n + m,Float64})
-    ground_level = prob_copy.constraints[inds[1]].z_min[3]
-    [push!(constraints, X[3, i] >= ground_level) for i in 1:N - 1]
-    verbose && println("Ground Constraint Set")
+    # inds = get_constraint_from_type(prob_copy.constraints,
+    #                                     BoundConstraint{1,n + m,Float64})
+    # ground_level = prob_copy.constraints[inds[1]].z_min[3]
+    # [push!(constraints, X[3, i] >= ground_level) for i in 1:N - 1]
+    # verbose && println("Ground Constraint Set at inds: $inds")
 
     # Fourth up is the max thrust constraint
     inds = get_constraint_from_type(prob_copy.constraints,
             NormConstraint{TrajectoryOptimization.SecondOrderCone,m,Float64})
     u_max = prob_copy.constraints[inds[1]].val
     [push!(constraints, norm(U[:,i]) <= u_max) for i in 1:N - 1]
-    verbose && println("Max Thrust Constraint Set")
+    verbose && println("Max Thrust Constraint Set at inds: $inds")
 
     # Fifth up is the max thrust angle constraint
     inds = get_constraint_from_type(prob_copy.constraints,
@@ -160,8 +160,18 @@ function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
     maxTAalpha = prob_copy.constraints[inds[1]].c[3]
     [push!(constraints, norm(U[1:2, i]) <= maxTAalpha * U[3, i])
                                                             for i in 1:N - 1]
+    verbose && println("Max Thrust Angle Constraint Set at inds: $inds")
 
-    verbose && println("Max Thrust Angle Constraint Set")
+    # Sixth up is the glidescope constraint
+    inds = get_constraint_from_type(prob_copy.constraints,
+            NormConstraint2{TrajectoryOptimization.SecondOrderCone,n,n,n})
+    glidescope = prob_copy.constraints[inds[1]].c[3]
+    [push!(constraints, cosd(70) * norm(U[1:3, i]) <= U[3, i])
+                                                            for i in 1:N - 1]
+    # glidescope = prob_copy.constraints[inds[2]].c[3]
+    # [push!(constraints, cosd(70) * norm(U[1:3, i]) <= U[3, i])
+    #                                                         for i in 1:N - 1]
+    verbose && println("Glidescope Constraint Set at inds: $inds")
 
     # Now we are done with the constraints!
     prob_ecos.constraints += constraints

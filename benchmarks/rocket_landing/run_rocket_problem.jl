@@ -36,7 +36,8 @@ x0_new = @SVector [4.0, 2.0, 20.0, -3.0, 2.0, -5.0]
 xf_new = @SVector zeros(6)
 N = 301
 dt = 0.05
-theta = 20
+theta = 20 # deg
+glide = 50 # deg
 
 opts = SolverOptions(
     cost_tolerance_intermediate=1e-2,
@@ -46,7 +47,11 @@ opts = SolverOptions(
     projected_newton = false,
     constraint_tolerance = 1.0e-8,
 )
-prob = RocketProblem(N, (N-1)*dt, x0=x0_new, θ_max=theta, integration=Exponential)
+prob = RocketProblem(N, (N-1)*dt,
+                            x0=x0_new,
+                            θ_thrust_max=theta,
+                            θ_glidescope=glide,
+                            integration=Exponential)
 solver = ALTROSolver(prob, opts, show_summary=true)
 Altro.solve!(solver)
 
@@ -83,7 +88,7 @@ println("Mean X0 Error      = $(mean(res[:err_x0],dims=1)[2])")
 model = prob_mpc.model
 X_e = SVector{6}.(eachcol(evaluate(X_ecos)))
 U_e = SVector{3}.(eachcol(evaluate(U_ecos)))
-Xprime = [discrete_dynamics(PassThrough, model, X[i], U[i], 0, dt)
+Xprime = [discrete_dynamics(PassThrough, model, X_e[i], U_e[i], 0, dt)
                                                             for i = 1:N_mpc-1]
 norm(Xprime - X_e[2:end],Inf)
 
@@ -101,3 +106,10 @@ xlabel!("Iterations")
 ylabel!("Error")
 title!("State and Control Error between ALTRO and ECOS")
 display(err_plt)
+
+time_plt = plot(res[:time][:, 1], labels = "ALTRO Times", legend = :topleft)
+plot!(res[:time][:, 2], labels = "ECOS Time")
+xlabel!("Iterations")
+ylabel!("Time")
+title!("Solve Time between ALTRO and ECOS over Iterations")
+display(time_plt)
