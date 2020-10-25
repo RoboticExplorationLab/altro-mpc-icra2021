@@ -30,6 +30,7 @@ include("rocket_landing_problem.jl")
 # include(joinpath("src","make_problem.jl"))
 include(joinpath("src","convert_Altro_to_Convex.jl"))
 include(joinpath("src","utils.jl"))
+include(joinpath("plotting","plot_comparison.jl"))
 
 
 ##
@@ -95,31 +96,18 @@ ecos, X_ecos, U_ecos = gen_ECOS_Rocket(prob_altro_mpc, Z_track, 1,
 
 altro_mpc = ALTROSolver(prob_altro_mpc, opts_mpc)
 Altro.solve!(altro_mpc)
-
 Convex.solve!(ecos, ecos_optimizer)
 
+# Show error in position
+plot_3set(states(altro_mpc), X_ecos,
+                        title = "Position between ALTRO and ECOS")
+# Show error in velocity
+plot_3set(states(altro_mpc), X_ecos, 3,
+                        title = "Velocity between ALTRO and ECOS")
+# # Show error in controls
+plot_3set(controls(altro_mpc), U_ecos,
+                        title = "Controls between ALTRO and ECOS")
 
-X_altro_mpc = states(altro_mpc)
-xs_altro_mpc = getArrAtInd(X_altro_mpc, 1)
-ys_altro_mpc = getArrAtInd(X_altro_mpc, 2)
-zs_altro_mpc = getArrAtInd(X_altro_mpc, 3)
-
-xs_ecos_mpc = evaluate(X_ecos)[1,1:end]
-ys_ecos_mpc = evaluate(X_ecos)[2,1:end]
-zs_ecos_mpc = evaluate(X_ecos)[3,1:end]
-
-plt_compare3d = plot3d(xs_altro_mpc, ys_altro_mpc, zs_altro_mpc,
-                                label = "ALTRO Trajectory")
-plot3d!(xs_ecos_mpc, ys_ecos_mpc, zs_ecos_mpc,
-                                label = "ECOS Trajectory")
-
-get_err(a, e) = log10.(max.(10^(-20), norm.(a - e)))
-
-
-err_xs = get_err(xs_altro_mpc, xs_ecos_mpc)
-err_ys = get_err(ys_altro_mpc, ys_ecos_mpc)
-err_zs = get_err(zs_altro_mpc, zs_ecos_mpc)
-
-plt_err = plot(err_xs, label = "x error")
-plot!(err_ys, label = "y error")
-plot!(err_zs, label = "z error")
+# Show error in position with reference trajectory
+plot_3setRef(states(altro_mpc), X_ecos, states(Z_track)[1:N_mpc],
+                        title = "Position between ALTRO and ECOS")

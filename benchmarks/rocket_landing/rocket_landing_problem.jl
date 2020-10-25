@@ -173,7 +173,7 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
 
     # Setup ECOS optimizer
     ecos_optimizer = ECOS.Optimizer(
-        verbose=opts_mpc.verbose > 0, 
+        verbose=opts_mpc.verbose > 0,
         feastol=opts_mpc.constraint_tolerance,
         abstol=opts_mpc.cost_tolerance,
         reltol=opts_mpc.cost_tolerance
@@ -237,6 +237,16 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         # Get the Euclidean norm beteen the initial states.
         err_x0[i,1] = norm(X_altro[:,1] - x0)
         err_x0[i,2] = norm(X_ecos_eval[:,1] - x0)
+
+        if mod(i, 50) == 0
+            println("Iteration $i")
+            plot_3setRef(states(altro), X_ecos,
+                    states(Z_track)[k_mpc:k_mpc + prob_mpc.N - 1],
+                    title = "Position between ALTRO and ECOS at iter $i")
+            plot_3setRef(controls(altro), U_ecos,
+                    controls(Z_track)[k_mpc:k_mpc + prob_mpc.N - 2],
+                    title = "Controls between ALTRO and ECOS at iter $i")
+        end
 
     end
     return X_traj, X_ecos, U_ecos, Dict(:time=>times, :iter=>iters,

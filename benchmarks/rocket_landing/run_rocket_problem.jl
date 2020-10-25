@@ -27,6 +27,8 @@ include("rocket_landing_problem.jl")
 # include(joinpath("src", "struct_setup.jl"))
 # include(joinpath("src","make_problem.jl"))
 include(joinpath("src","convert_Altro_to_Convex.jl"))
+include(joinpath("src","utils.jl"))
+include(joinpath("plotting","plot_comparison.jl"))
 
 
 ## Set up initial "cold start" problem
@@ -88,4 +90,3 @@ norm(Xprime - X[2:end],Inf)
 using Plots
 plot(X, inds=1:3)
 plot!(states(Z_track), inds=1:3, color=[1 2 3], linestyle=:dash)
-
