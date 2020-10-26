@@ -2,7 +2,7 @@ import Pkg; Pkg.activate(@__DIR__); Pkg.instantiate()
 # using MATLAB
 using JLD2
 
-@load joinpath(dirname(@__FILE__),"timing_data.jld2") altro_times osqp_times altro_times_socp
+@load joinpath(dirname(@__FILE__),"timing_data.jld2") altro_times osqp_times altro_times_socp ecos_times
 
 # t = 1:1:36
 # mat"
@@ -19,26 +19,26 @@ using JLD2
 # hold off
 # "
 
-using Plots
-using PGFPlotsX
-pgfplotsx()
+# using Plots
+# using PGFPlotsX
+# pgfplotsx()
 
-bins = collect(0:100:5000)
+# bins = collect(0:100:5000)
 
-histogram(altro_times ./ 1000, bins=bins, fillalpha=0.33, xlabel="Solve Times (microsecond)", title="Altro vs OSQP Solve Times", label="Altro")
-histogram!(osqp_times ./ 1000, bins=bins, fillalpha=0.33, label="OSQP")
-histogram!(altro_times_socp ./ 1000, bins=bins, fillalpha=0.33, label="Altro w/ SOCP")
-pgfsave("histogram.tikz", h)
+# histogram(altro_times ./ 1000, bins=bins, fillalpha=0.33, xlabel="Solve Times (microsecond)", title="Altro vs OSQP Solve Times", label="Altro")
+# histogram!(osqp_times ./ 1000, bins=bins, fillalpha=0.33, label="OSQP")
+# histogram!(altro_times_socp ./ 1000, bins=bins, fillalpha=0.33, label="Altro w/ SOCP")
+# pgfsave("histogram.tikz", h)
 
 
-using StatsBase
+# using StatsBase
 
-figure = @pgf Axis(
-    {
-        "ybar interval",
-        xmajorgrids = false,
-        xtick_distance="{50}",
-    },
-    Plot(Table(fit(Histogram, altro_times ./ 1000)))
-)
-pgfsave("altro_hist.tikz", figure, include_preamble=false)
+# figure = @pgf Axis(
+#     {
+#         "ybar interval",
+#         xmajorgrids = false,
+#         xtick_distance="{50}",
+#     },
+#     Plot(Table(fit(Histogram, altro_times ./ 1000)))
+# )
+# pgfsave("altro_hist.tikz", figure, include_preamble=false)

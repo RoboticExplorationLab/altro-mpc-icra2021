@@ -1,4 +1,8 @@
-struct OptimizerParams{T,S,M}
+# OSQP solver deps:
+using OSQP
+using SparseArrays
+
+struct OSQPParams{T,S,M}
     dt::T
     N::S
 
@@ -23,7 +27,7 @@ end
 select(i, n) = (n*(i-1)+1):(n*(i-1)+n)
 selectn_l(i, j, k, n=12, l=3) = n*(i-1) + l*(j-1) + k
 
-function OptimizerParams(
+function OSQPParams(
     dt::T,
     N::S,
     q::AbstractVector{T},
@@ -130,7 +134,7 @@ function OptimizerParams(
     B_vec = [@SMatrix zeros(n,m) for i=1:(N-1)]
     d_vec = [@SVector zeros(n) for i=1:(N-1)]
 
-    return OptimizerParams{T,S,M}(
+    return OSQPParams{T,S,M}(
         dt,
         N,
         model,

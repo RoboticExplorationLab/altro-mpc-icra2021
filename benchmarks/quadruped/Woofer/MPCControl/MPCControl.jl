@@ -10,7 +10,6 @@ using Rotations
 using ..QuadrupedDynamics
 using ForwardDiff
 using BenchmarkTools
-import YAML
 
 include("../Config.jl")
 include("../Utilities.jl")

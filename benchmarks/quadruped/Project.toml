@@ -1,6 +1,8 @@
 [deps]
 Altro = "5dcf52e5-e2fb-48e0-b826-96f46d2e3e73"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Convex = "f65535da-76fb-5f13-bab9-19810c17039a"
+ECOS = "e2685f51-7e38-5353-a97d-a921fd2c8199"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
