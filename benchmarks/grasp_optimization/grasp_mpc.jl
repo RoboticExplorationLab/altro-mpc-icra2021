@@ -22,16 +22,16 @@ Altro.solve!(altro)
 Z_track = get_trajectory(altro)
 
 # MPC Setup
-num_iters = 15 # number of MPC iterations
-hor = 10 # length of the MPC horizon in number of steps
+num_iters = 20 # number of MPC iterations
+N_mpc = 10 # length of the MPC horizon in number of steps
 
 Q = prob_cold.obj[1].Q[1]
 R = prob_cold.obj[1].R[1]
 Qf = prob_cold.obj[end].Q[1]
 
-prob_mpc = gen_tracking_problem(prob_cold, hor, Qk = Q, Rk = R, Qfk = Qf)
+prob_mpc = gen_tracking_problem(prob_cold, N_mpc, Qk = Q, Rk = R, Qfk = Qf)
 
-function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 15)
+function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20)
     x0 = state(Z_track[1])
     u0 = control(Z_track[1])
 
@@ -42,6 +42,7 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 15)
     altro_states[1] = x0
     altro_controls = [zero(u0) for i = 1:num_iters]
     ecos_times = zeros(num_iters)
+    ecos_controls = copy(altro_controls)
 
     # altro solver
     altro = ALTROSolver(prob_mpc, opts_mpc)
@@ -64,14 +65,14 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 15)
         Altro.solve!(altro)
 
         # Solve Ecos
-        b_ecos = @benchmark Convex.solve!($prob_mpc_ecos, $ecos) samples=1 evals=1
+        # b_ecos = @benchmark Convex.solve!($prob_mpc_ecos, $ecos) samples=1 evals=1
         Convex.solve!(prob_mpc_ecos, ecos)
 
         # Printouts
         println("Timestep $iter")
         print("ALTRO runtime: $(round(altro.stats.tsolve, digits=2)) ms")
         println("\t Max violation: $(TrajectoryOptimization.max_violation(altro))")
-        print("ECOS runtime: $(round(median(b_ecos).time/1e6, digits=2)) ms")
+        print("ECOS runtime: $(round(1000*ecos.sol.solve_time, digits=2)) ms")
         println("\tStatus: ", prob_mpc_ecos.status)
         println("Control diff = ", round(norm(control(prob_mpc.Z[1]) - U_ecos.value[:, 1]), digits=2))
 
@@ -80,10 +81,32 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 15)
         altro_iters[iter] = iterations(altro)
         altro_states[iter+1] = state(prob_mpc.Z[1])
         altro_controls[iter] = control(prob_mpc.Z[1])
-        ecos_times[iter] = median(b_ecos).time/1e6
+        ecos_times[iter] = 1000*ecos.sol.solve_time
+        ecos_controls[iter] = U_ecos.value[:, 1]
     end
 
     altro_traj = Dict(:states=>altro_states, :controls=>altro_controls)
-    altro_res = Dict(:time=>altro_times, :iter=>altro_iters)
-    return altro_traj, altro_res, ecos_times
+    res = Dict(:time=>[altro_times ecos_times], :iter=>altro_iters)
+
+    # Print Solve Time Difference
+    ave_diff = (sum(ecos_times) - sum(altro_times))/length(altro_times)
+    println("\n Average ALTRO solve time was $(round(ave_diff, digits=2)) ms faster than that of ECOS")
+
+    return res, altro_traj, ecos_controls
 end
+
+## Test single run
+# res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts, Z_track, num_iters)
+
+## Plot Timing Results
+# using Plots
+# altro_times = res[:time][:,1]
+# ecos_times = res[:time][:,2]
+# bounds = extrema([altro_times; ecos_times])
+# bin_min = floor(Int, bounds[1]) - 1
+# bin_max = ceil(Int, bounds[2]) + 1
+# bins = collect(bin_min:bin_max)
+# histogram(altro_times, bins=bins, fillalpha=.5, label="ALTRO")
+# histogram!(ecos_times, bins=bins, fillalpha=.5, label="ECOS")
+# xlabel!("Solve Time (ms)")
+# ylabel!("Counts")

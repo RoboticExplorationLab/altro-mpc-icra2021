@@ -1,4 +1,4 @@
-function GraspProblem(o::SquareObject, N = 31, tf = 3.0)
+function GraspProblem(o::SquareObject, N = 51, tf = 5.0)
     n, m = size(o)
     dt = tf/(N-1)   # time step
 

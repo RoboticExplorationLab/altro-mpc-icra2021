@@ -71,7 +71,22 @@ end
 RobotDynamics.state_dim(o::SquareObject) = o.n
 RobotDynamics.control_dim(o::SquareObject) = o.m
 
-function noisy_discrete_dynamics(model::SquareObject, x, u, dt, noise)
-    z = KnotPoint(x, u, dt)
-    return discrete_dynamics(model, z) + noise
+function RobotDynamics.discrete_dynamics(::Type{PassThrough}, model::SquareObject,
+        x::StaticVector, u::StaticVector, t, dt)
+
+    g = model.g
+    m = model.mass
+
+    nqd = Int(model.n/2)
+    q  = x[SA[1,2,3]]
+    qd = x[SA[4,5,6]]
+
+    F1 = u[SA[1,2,3]]
+    F2 = u[SA[1,2,3]]
+    u = 1/m * (F1 + F2) + g
+
+    q⁺ = q + qd*dt + .5*u*dt^2
+    qd⁺ = qd + u*dt
+
+    return [q⁺; qd⁺] 
 end

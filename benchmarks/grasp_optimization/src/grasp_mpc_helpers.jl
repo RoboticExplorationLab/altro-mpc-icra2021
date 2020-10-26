@@ -3,6 +3,7 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
 
     # Update Initial Time
     dt = prob_mpc.Z[1].dt
+
     TO.set_initial_time!(prob_mpc, k_mpc*dt)
 
     # Update initial state by using 1st control, and adding some noise
@@ -18,8 +19,7 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
 
     # Setup ECOS
     prob_mpc_ecos, X_ecos, U_ecos = gen_ECOS(prob_mpc, k_mpc, Z_track)
-    e_cons = prob_mpc_ecos.constraints
-    e_cons += X_ecos[:,1] == x0 # Initial condition
+    prob_mpc_ecos.constraints += X_ecos[:,1] == x0 # Initial condition
 
     # Update ALTRO and ECOS Stage Constraints
     i_c = 1 # constraint index
@@ -35,7 +35,7 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
         prob_mpc.constraints[i_c].A .= A
         prob_mpc.constraints[i_c].b .= b
 
-        e_cons += A*U_ecos[:, i] == b
+        prob_mpc_ecos.constraints += A*U_ecos[:, i] == b
 
         i_c += 1
 
@@ -44,7 +44,7 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
         prob_mpc.constraints[i_c].A[2,1+Int(m/2):end] .= o.v[2][i_s]
 
         A = copy(prob_mpc.constraints[i_c].A)
-        e_cons += A*U_ecos[:, i] <= o.f*ones(2)
+        prob_mpc_ecos.constraints += A*U_ecos[:, i] <= o.f*ones(2)
 
         i_c += 1
 
@@ -55,7 +55,7 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
 
         A = copy(prob_mpc.constraints[i_c].A)
         c = copy(prob_mpc.constraints[i_c].c)
-        e_cons += norm(A*F1) <= c'*F1
+        prob_mpc_ecos.constraints += norm(A*F1) <= c'*F1
 
         i_c += 1
 
@@ -66,15 +66,15 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
 
         A = copy(prob_mpc.constraints[i_c].A)
         c = copy(prob_mpc.constraints[i_c].c)
-        e_cons += norm(A*F2) <= c'*F2
+        prob_mpc_ecos.constraints += norm(A*F2) <= c'*F2
 
         i_c += 1
 
         # Dynamics Constraints for ECOS
         u = 1/o.mass * (F1 + F2) + o.g
         pos_ind = 1:3; vel_ind = 4:6
-        e_cons += X_ecos[vel_ind, i+1] == X_ecos[vel_ind, i] + u*dt
-        e_cons += X_ecos[pos_ind, i+1] == X_ecos[pos_ind, i] + X_ecos[vel_ind, i]*dt + u*.5*dt^2
+        prob_mpc_ecos.constraints += X_ecos[vel_ind, i+1] == X_ecos[vel_ind, i] + u*dt
+        prob_mpc_ecos.constraints += X_ecos[pos_ind, i+1] == X_ecos[pos_ind, i] + X_ecos[vel_ind, i]*dt + u*.5*dt^2
     end
 
     return prob_mpc_ecos, U_ecos
@@ -95,16 +95,16 @@ function gen_ECOS(prob_mpc, k_mpc, Z_track)
     set_value!(U, hcat(Vector.(U_warm)...))
 
     # Get Tracking Trajectory
-    X_ref = states(Z_track)[k_mpc .+ (1:N_mpc)]
+    X_ref = states(Z_track)[(k_mpc-1) .+ (1:N_mpc)]
     X_ref = hcat(Vector.(X_ref)...)
 
-    U_ref = states(Z_track)[k_mpc .+ (1:N_mpc-1)]
+    U_ref = states(Z_track)[(k_mpc-1) .+ (1:N_mpc-1)]
     U_ref = hcat(Vector.(U_ref)...)
 
     # Set Tracking Objective
     Q = prob_mpc.obj[1].Q[1]
-    Qf = prob_mpc.obj[1].R[1]
-    R = prob_mpc.obj[end].Q[1]
+    R = prob_mpc.obj[1].R[1]
+    Qf = prob_mpc.obj[end].Q[1]
     objective = Q*sumsquares(X[:,1:N_mpc-1]-X_ref[:, 1:N_mpc-1]) + Qf*sumsquares(X[:,N_mpc]-X_ref[:,N_mpc]) + R*sumsquares(U-U_ref)
     prob_mpc_ecos = minimize(objective)
 

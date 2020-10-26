@@ -6,33 +6,24 @@ using TrajectoryOptimization, Altro
 const TO = TrajectoryOptimization
 using RobotDynamics
 const RD = RobotDynamics
+using JLD2
 
-# Setup Benchmark
 include("grasp_mpc.jl")
+include("src/plotting.jl")
 
 # Run Benchmark
-println("Starting MPC Benchmark:")
-altro_traj, altro_res, ecos_times = run_grasp_mpc(prob_mpc, opts, Z_track)
+println("Starting MPC Benchmark...")
+Ns = [10, 15, 25]
+results = map(Ns) do N_mpc
+    println("Running with $N_mpc knot points...")
+    prob_mpc = gen_tracking_problem(prob_cold, N_mpc, Qk = Q, Rk = R, Qfk = Qf)
+    run_grasp_mpc(prob_mpc, opts, Z_track)
+end
 
-# Solve Time Difference
-altro_times = altro_res[:time]
-ave_diff = (sum(ecos_times) - sum(altro_times))/length(altro_times)
-println("\n Average ALTRO solve time was $(round(ave_diff, digits=2)) ms faster than that of ECOS")
+# Save Results
+@save string(@__DIR__,"/grasp_benchmark_data.jld2") results Ns
 
-## Uncomment to save results
-
-# # Save Results
-# using JLD2
-# @save string(@__DIR__,"/grasp_benchmark_data.jld2") altro_times ecos_times
-#
-# # Plot Timing Results
-# using Plots
-# bounds = extrema([altro_times; ecos_times])
-# bin_min = floor(Int, bounds[1]) - 1
-# bin_max = ceil(Int, bounds[2]) + 1
-# bins = collect(bin_min:bin_max)
-# histogram(altro_times, bins=bins, fillalpha=.5, label="ALTRO")
-# histogram!(ecos_times, bins=bins, fillalpha=.5, label="ECOS")
-# xlabel!("Solve Time (ms)")
-# ylabel!("Counts")
-# png(string(@__DIR__,"/grasp_benchmark_hist.png"))
+# Generate Plots
+# timing_results = [results[i][1] for i=1:length(Ns)]
+# p = comparison_plot(timing_results, Ns, "knot points (N)")
+# pgfsave(string(@__DIR__,"/horizon_comp.tikz"), p, include_preamble=false)
