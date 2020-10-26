@@ -98,7 +98,7 @@ function plot_3setRef(a, e, ref, offset = 0;
 
 end
 
-slope(θ, deg=true) = deg ? (sind(90 - θ) / cosd(90 - θ)) : (sin(pi/2 - θ) / cos(pi/2 - θ))
+slope(θ, deg=true) = deg ? (tand(90 - θ)) : (tan(pi/2 - θ))
 
 function plot_glide_angle(a, e, ref, offset = 0;
                             title = "Glidescope for ALTRO and ECOS",
@@ -128,6 +128,10 @@ function plot_glide_angle(a, e, ref, offset = 0;
     println("Size e -> $(size(var_e3))")
     println("Size ref -> $(size(var_ref3))")
 
+    println("Max a -> $(maximum(var_a_lat))")
+    println("Max e -> $(maximum(var_e_lat))")
+    println("Max ref -> $(maximum(var_ref_lat))")
+
     m1 = slope(theta)
     max_x = max(maximum(var_a_lat), maximum(var_e_lat), maximum(var_ref_lat))
 
@@ -139,7 +143,7 @@ function plot_glide_angle(a, e, ref, offset = 0;
                                 linestyle = :dot)
     plot!(var_a_lat, var_a3, label = "ALTRO Trajectory", linestyle = :dash)
     plot!(var_e_lat, var_e3, label = "ECOS Trajectory", linestyle = :dash)
-    plot!(0:max_x, x -> m1 * x, label = "Glidescope Edge")
+    plot!(0:0.1:max_x, x -> m1 * x, label = "Glidescope Edge")
     title!(title)
 
     if show_plot

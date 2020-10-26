@@ -51,7 +51,7 @@ function RocketProblem(N=101, tf=10.0;
         ωPlanet = [0.0; 0.0; 0.0],
         perWeightMax = 2.0,
         θ_thrust_max = 7.0,  # deg
-        θ_glidescope = 60.0, # deg
+        θ_glideslope = 60.0, # deg
         include_goal = true,
         integration=RD.Exponential
     )
@@ -111,10 +111,12 @@ function RocketProblem(N=101, tf=10.0;
 
     Lastly, the constraint is written as ||u|| ≤ u_max
     =#
-    @assert perWeightMax > 1
-    u_bnd = mass * abs(grav[3]) * perWeightMax
-    maxThrust = NormConstraint(n, m, u_bnd, TO.SecondOrderCone(), :control)
-    TO.add_constraint!(cons, maxThrust, 1:N-1)
+    if true
+        @assert perWeightMax > 1
+        u_bnd = mass * abs(grav[3]) * perWeightMax
+        maxThrust = NormConstraint(n, m, u_bnd, TO.SecondOrderCone(), :control)
+        TO.add_constraint!(cons, maxThrust, 1:N-1)
+    end
 
     # Max Thrust Angle
     #=
@@ -123,47 +125,51 @@ function RocketProblem(N=101, tf=10.0;
     We write this as || [u_x; u_y] || ≤ tan(θ) u_z
     To write this in the SOCP form of ||Ax|| ≤ c'x, we take the A and c below.
     =#
-    α_max = getalpha(θ_thrust_max)
-    ARocket = SA_F64[
-        1 0 0;
-        0 1 0;
-        0 0 0
-    ]
-    cRocket = SA_F64[0, 0, α_max]
-    maxAngle = NormConstraint2(n, m, ARocket, cRocket,
-                                    TO.SecondOrderCone(), :control)
-    TO.add_constraint!(cons, maxAngle, 1:N-1)
+    if true
+        α_max = getalpha(θ_thrust_max)
+        ARocket = SA_F64[
+            1 0 0;
+            0 1 0;
+            0 0 0
+        ]
+        cRocket = SA_F64[0, 0, α_max]
+        maxAngle = NormConstraint2(n, m, ARocket, cRocket,
+                                        TO.SecondOrderCone(), :control)
+        TO.add_constraint!(cons, maxAngle, 1:N-1)
+    end
 
-
-    # Glidescope Constraint
+    # Glideslope Constraint
     #=
     This prevents trajectories that drifts near the surface (which is a safety
     risk). As we make the that angle larger, the constraint is more lenient.
     The angle cannot be larger than 90 deg.
     =#
-    α_glide = getalpha(θ_glidescope)
-    AGlide = SA_F64[
-        1 0 0 0 0 0;
-        0 1 0 0 0 0;
-        0 0 0 0 0 0;
-        0 0 0 0 0 0;
-        0 0 0 0 0 0;
-        0 0 0 0 0 0
-    ]
-    cGlide = SA_F64[0, 0, α_glide, 0, 0, 0]
-    glidescope = NormConstraint2(n, m, AGlide, cGlide,
-                                    TO.SecondOrderCone(), :state)
-    TO.add_constraint!(cons, glidescope, 1:N-1)
-    # α_glide = cosd(θ_glidescope)
+
+    if true
+        α_glide = getalpha(θ_glideslope)
+        AGlide = SA_F64[
+            1 0 0 0 0 0;
+            0 1 0 0 0 0;
+            0 0 0 0 0 0;
+            0 0 0 0 0 0;
+            0 0 0 0 0 0;
+            0 0 0 0 0 0
+        ]
+        cGlide = SA_F64[0, 0, α_glide, 0, 0, 0]
+        glideslope = NormConstraint2(n, m, AGlide, cGlide,
+                                        TO.SecondOrderCone(), :state)
+        TO.add_constraint!(cons, glideslope, 1:N-1)
+    end
+    # α_glide = cosd(θ_glideslope)
     # AGlide = SA_F64[
     #     1 0 0;
     #     0 1 0;
     #     0 0 1
     # ]
     # cGlide = SA_F64[0, 0, 1/α_glide]
-    # glidescope = NormConstraint2(n, m, AGlide, cGlide,
+    # glideslope = NormConstraint2(n, m, AGlide, cGlide,
     #                                 TO.SecondOrderCone(), :control)
-    # TO.add_constraint!(cons, glidescope, 1:N-1)
+    # TO.add_constraint!(cons, glideslope, 1:N-1)
 
     """
     Problem
@@ -227,12 +233,16 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         x0 = discrete_dynamics(TO.integration(prob_mpc),
                                     prob_mpc.model, prob_mpc.Z[1])
         x0 += (@SVector randn(n)) * norm(x0,Inf) / 100  # 1% noise
-        x0_NoGround = [x for x in [x0[1:2]..., max(x0[3], 0.0), x0[4:6]...]]
-        println("Iter $i : $(x0[1:3])")
 
-        if x0 != x0_NoGround
-            println("Iter $i : x0 = $x0 && x0_NoGround = $x0_NoGround")
-        end
+        lateral = norm(x0[1:2])
+        angle = atand(lateral, x0[3])
+        println("Iter $i : Angle = $angle")
+        # To assert that the error does not drive the rocket into the ground.
+        # x0_NoGround = [x for x in [x0[1:2]..., max(x0[3], 0.0), x0[4:6]...]]
+        #
+        # if x0 != x0_NoGround
+        #     println("Iter $i : x0 = $x0 && x0_NoGround = $x0_NoGround")
+        # end
 
         TO.set_initial_state!(prob_mpc, x0)
         X_traj[i+1] = x0
@@ -258,7 +268,7 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         # iters[i,2] = res.info.iter
         # times[i,1] = median(b).time * 1e-6
         times[i,1] = altro.stats.tsolve
-        # times[i,2] = res.info.solve_time * 1000
+        times[i,2] = ecos_optimizer.sol.solve_time * 1000
 
         # compare the solutions....
         # Grab the X and U trajectories from ALTRO

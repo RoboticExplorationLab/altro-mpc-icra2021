@@ -37,20 +37,26 @@ xf_new = @SVector zeros(6)
 N = 301
 dt = 0.05
 theta = 20 # deg
-glide = 50 # deg
+glide = 45 # deg
 
+# We ask for a high quality reference trajectory so we allow a lot of
+# iterations to make it happen
 opts = SolverOptions(
     cost_tolerance_intermediate=1e-2,
     penalty_scaling=10.,
     penalty_initial=1.0,
-    verbose = 1,
+    # verbose = 1,
     projected_newton = false,
     constraint_tolerance = 1.0e-8,
+    iterations = 5000,
+    iterations_inner = 100,
+    iterations_linesearch = 100,
+    iterations_outer = 500
 )
 prob = RocketProblem(N, (N-1)*dt,
                             x0=x0_new,
                             θ_thrust_max=theta,
-                            θ_glidescope=glide,
+                            θ_glideslope=glide,
                             integration=Exponential)
 solver = ALTROSolver(prob, opts, show_summary=true)
 Altro.solve!(solver)
@@ -79,11 +85,11 @@ prob_mpc = RocketProblemMPC(prob, N_mpc,
 Z_track = prob.Z
 X, X_ecos, U_ecos, res = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track)
 
-println("Mean Time          = $(mean(res[:time],dims=1)[1])")
-println("Mean Iterations    = $(mean(res[:iter],dims=1)[1])")
-println("Mean State Error   = $(mean(res[:err_traj],dims=1)[1])")
-println("Mean Control Error = $(mean(res[:err_traj],dims=1)[2])")
-println("Mean X0 Error      = $(mean(res[:err_x0],dims=1)[2])")
+println("Median Time          = $(median(res[:time],dims=1)[1])")
+println("Median Iterations    = $(median(res[:iter],dims=1)[1])")
+println("Median State Error   = $(median(res[:err_traj],dims=1)[1])")
+println("Median Control Error = $(median(res[:err_traj],dims=1)[2])")
+println("Median X0 Error      = $(median(res[:err_x0],dims=1)[2])")
 
 model = prob_mpc.model
 X_e = SVector{6}.(eachcol(evaluate(X_ecos)))
@@ -96,6 +102,7 @@ norm(Xprime - X_e[2:end],Inf)
 using Plots
 time_plt = plot(X, inds=1:3)
 plot!((N - N_mpc):(N - 1), X_e, inds=1:3, color=[1 2 3], linestyle=:dash)
+plot!((N - N_mpc):(N - 1), states(prob_mpc.Z), inds=1:3, color=[1 2 3], linestyle=:dash)
 plot!(states(prob.Z), inds=1:3, color=[1 2 3], linestyle=:dot)
 display(time_plt)
 
@@ -110,6 +117,6 @@ display(err_plt)
 time_plt = plot(res[:time][:, 1], labels = "ALTRO Times", legend = :topleft)
 plot!(res[:time][:, 2], labels = "ECOS Time")
 xlabel!("Iterations")
-ylabel!("Time")
+ylabel!("Time (ms)")
 title!("Solve Time between ALTRO and ECOS over Iterations")
 display(time_plt)
