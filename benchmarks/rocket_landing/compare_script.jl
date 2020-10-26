@@ -92,10 +92,12 @@ ecos_optimizer = ECOS.Optimizer(
 )
 
 N_mpc = 51
+Qk_mpc, Qfk_mpc, Rk_mpc = 10., 100.0, 1e-1
+
 prob_altro_mpc = RocketProblemMPC(prob_altro_cold, N_mpc,
-    Qk = 10.,
-    Qfk = 100.0,
-    Rk = 1e-1,
+    Qk = Qk_mpc,
+    Qfk = Qfk_mpc,
+    Rk = Rk_mpc,
 )
 
 Z_track = prob_altro_cold.Z
@@ -105,6 +107,22 @@ ecos, X_ecos, U_ecos = gen_ECOS_Rocket(prob_altro_mpc, Z_track, 1,
 altro_mpc = ALTROSolver(prob_altro_mpc, opts_mpc)
 Altro.solve!(altro_mpc)
 Convex.solve!(ecos, ecos_optimizer)
+
+
+x_a = getX_toECOS(get_trajectory(altro_mpc))
+u_a = getU_toECOS(get_trajectory(altro_mpc))
+
+x_e = evaluate(X_ecos)
+u_e = evaluate(U_ecos)
+
+x_t_a = getX_toECOS(Z_track)
+u_t_a = getU_toECOS(Z_track)
+
+altro_cost = sanity_check_cost(x_a, u_a, x_t_a, u_t_a, Qk_mpc, Qfk_mpc, Rk_mpc)
+ecos_cost = sanity_check_cost(x_e, u_e, x_t_a, u_t_a, Qk_mpc, Qfk_mpc, Rk_mpc)
+ref_cost = sanity_check_cost(x_t_a, u_t_a, x_t_a, u_t_a, Qk_mpc, Qfk_mpc, Rk_mpc)
+
+println("Altro_cost = $altro_cost, ecos_cost = $ecos_cost, ref = $ref_cost")
 
 # Show error in position
 plot_3set(states(altro_mpc), X_ecos,

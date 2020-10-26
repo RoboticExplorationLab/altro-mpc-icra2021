@@ -52,6 +52,7 @@ function RocketProblem(N=101, tf=10.0;
         perWeightMax = 2.0,
         θ_thrust_max = 7.0,  # deg
         θ_glideslope = 60.0, # deg
+        glide_recover_k = 20,
         include_goal = true,
         integration=RD.Exponential
     )
@@ -158,7 +159,7 @@ function RocketProblem(N=101, tf=10.0;
         cGlide = SA_F64[0, 0, α_glide, 0, 0, 0]
         glideslope = NormConstraint2(n, m, AGlide, cGlide,
                                         TO.SecondOrderCone(), :state)
-        TO.add_constraint!(cons, glideslope, 8:N-1)
+        TO.add_constraint!(cons, glideslope, glide_recover_k:N-1)
     end
     # α_glide = cosd(θ_glideslope)
     # AGlide = SA_F64[
@@ -193,11 +194,22 @@ function RocketProblemMPC(prob::TO.Problem, N; kwargs...)
     prob = gen_tracking_problem(prob, N; kwargs...)
 end
 
-function sanity_check_cost(X, U, X_track, U_track, Qk, Qfk, Rk)
+function sanity_check_cost(X, U, X_track, U_track,
+                                Qk = 1,
+                                Qfk = 1,
+                                Rk = 1;
+                                verbose = false)
     # (X-X_t)'Q(X-X_t) + (Xf-Xf_t)'Qf(Xf-Xf_t) + (U-U_t)'R(U-U_t)
-    return Qk * sum(X[1:end - 1] - X_track[1:end - 1]) +
-                                Qfk * (X[end] - X_track[end]) +
-                                Rk * sum(U - U_track)
+    N = size(X, 2)
+
+    xCost = Qk * sum([(X[:,i] - X_track[:,i])' * (X[:,i] - X_track[:,i])
+                                                    for i in 1:N - 1])
+    xfCost = Qfk * (X[:,end] - X_track[:,N])' * (X[:,end] - X_track[:,N])
+    uCost = Rk * sum([(U[:,i] - U_track[:,i])' * (U[:,i] - U_track[:,i])
+                                                    for i in 1:N - 1])
+
+    verbose && println("xCost = $xCost, xfCost = $xfCost, uCost = $uCost")
+    return xCost + xfCost + uCost
 end
 
 function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
@@ -207,6 +219,13 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
 
     # To match the altro problem, we can derive it from the altro
     ecos, X_ecos, U_ecos = gen_ECOS_Rocket(prob_mpc, Z_track, 1, verbose = true)
+
+    reformat_X_track = getX_toECOS(Z_track)
+    reformat_U_track = getU_toECOS(Z_track)
+
+    Qk = prob_mpc.obj[1].Q[1]
+    Rk = prob_mpc.obj[1].R[1]
+    Qfk = prob_mpc.obj[end].Q[1]
 
     # Solve initial iteration
     Altro.solve!(altro)
@@ -240,7 +259,16 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         # Update initial state by using 1st control, and adding some noise
         x0 = discrete_dynamics(TO.integration(prob_mpc),
                                     prob_mpc.model, prob_mpc.Z[1])
-        x0 += (@SVector randn(n)) * norm(x0,Inf) / 100  # 1% noise
+        # x0 += (@SVector randn(n)) * norm(x0,Inf) / 100  # 1% noise
+        # noise = @SVector [d for d in [randn(3); zeros(3)]]
+        # x0 += noise * norm(x0,Inf) / 100  # 1% noise
+        noise_pos = @SVector randn(3)
+        noise_vel = @SVector randn(3)
+
+        pos_norm = norm(x0[1:3], Inf) / 100 # 1% noise
+        vel_norm = norm(x0[4:6], Inf) / 1e6 # 1ppm noise
+
+        x0 += [noise_pos * pos_norm; noise_vel * vel_norm]
 
         lateral = norm(x0[1:2])
         angle = atand(lateral, x0[3])
@@ -310,8 +338,26 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
             #         title = "Controls between ALTRO and ECOS at iter $i")
         end
 
-        println("ALTRO cost = $(altro.stats.cost[end])")
-        println("ECOS cost  = $(ecos_optimizer.sol.objective_value)")
+        altro_cost = sanity_check_cost(X_altro, U_altro,
+                                reformat_X_track, reformat_U_track,
+                                Qk, Qfk, Rk)
+        ecos_cost  = sanity_check_cost(X_ecos_eval, U_ecos_eval,
+                                reformat_X_track, reformat_U_track,
+                                Qk, Qfk, Rk)
+        ref_cost   = sanity_check_cost(reformat_X_track, reformat_U_track,
+                                reformat_X_track, reformat_U_track,
+                                Qk, Qfk, Rk)
+        cost_diff  = altro_cost - ecos_cost
+
+        if cost_diff > 1
+            println("ALTRO cost                = $altro_cost")
+            println("ECOS cost                 = $ecos_cost")
+            println("Cost Difference (~ zero)  = $(altro_cost - ecos_cost)")
+        end
+
+        if ref_cost != 0.0
+            println("Ref cost (should be zero) = $ref_cost")
+        end
 
     end
     return X_traj, X_ecos, U_ecos, Dict(:time=>times, :iter=>iters,

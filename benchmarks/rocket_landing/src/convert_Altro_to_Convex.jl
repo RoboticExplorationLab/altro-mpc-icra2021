@@ -147,38 +147,44 @@ function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
     # verbose && println("Ground Constraint Set at inds: $inds")
 
     # Fourth up is the max thrust constraint
-    inds = get_constraint_from_type(prob_copy.constraints,
+    c_index = get_constraint_from_type(prob_copy.constraints,
             NormConstraint{TrajectoryOptimization.SecondOrderCone,m,Float64})
-    if !isempty(inds)
-        u_max = prob_copy.constraints[inds[1]].val
-        [push!(constraints, norm(U[:,i]) <= u_max) for i in 1:N - 1]
-        verbose && println("Max Thrust Constraint Set at inds: $inds")
+
+    if !isempty(c_index)
+        c_inds = prob_copy.constraints.inds[c_index[1]]
+        u_max = prob_copy.constraints[c_index[1]].val
+        [push!(constraints, norm(U[:,i]) <= u_max) for i in c_inds]
+        verbose && println("Max Thrust Constraint Set at inds: $c_index")
     else
         verbose && println("Missing Max Thrust Constraint")
     end
 
     # Fifth up is the max thrust angle constraint
-    inds = get_constraint_from_type(prob_copy.constraints,
+    c_index = get_constraint_from_type(prob_copy.constraints,
             NormConstraint2{TrajectoryOptimization.SecondOrderCone,m,m,m})
-    if !isempty(inds)
-        maxTAalpha = prob_copy.constraints[inds[1]].c[3]
+
+    if !isempty(c_index)
+        c_inds = prob_copy.constraints.inds[c_index[1]]
+        maxTAalpha = prob_copy.constraints[c_index[1]].c[3]
         [push!(constraints, norm(U[1:2, i]) <= maxTAalpha * U[3, i])
-                                                            for i in 1:N - 1]
-        verbose && println("Max Thrust Angle Constraint Set at inds: $inds")
+                                                            for i in c_inds]
+        verbose && println("Max Thrust Angle Constraint Set at inds: $c_index")
     else
         verbose && println("Missing Max Thrust Angle Constraint")
     end
 
     # Sixth up is the glideslope constraint
-    inds = get_constraint_from_type(prob_copy.constraints,
+    c_index = get_constraint_from_type(prob_copy.constraints,
             NormConstraint2{TrajectoryOptimization.SecondOrderCone,n,n,n})
-    if !isempty(inds)
-        glideslope = prob_copy.constraints[inds[1]].c[3]
+
+    if !isempty(c_index)
+        c_inds = prob_copy.constraints.inds[c_index[1]]
+        glideslope = prob_copy.constraints[c_index[1]].c[3]
         [push!(constraints, norm(X[1:2, i]) <= glideslope * X[3, i])
-                                                            for i in 8:N - 1]
+                                                            for i in c_inds]
         # [push!(constraints, cosd(70) * norm(U[1:3, i]) <= U[3, i])
         #                                                     for i in 1:N - 1]
-        verbose && println("Glideslope Constraint Set at inds: $inds")
+        verbose && println("Glideslope Constraint Set at inds: $c_index")
     else
         verbose && println("Missing Glideslope Constraint")
     end
