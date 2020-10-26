@@ -49,11 +49,15 @@ opts = SolverOptions(
     verbose = 1,
     projected_newton = false,
     constraint_tolerance = 1.0e-8,
+    iterations = 5000,
+    iterations_inner = 100,
+    iterations_linesearch = 100,
+    iterations_outer = 500
 )
 prob_altro_cold = RocketProblem(N, (N-1)*dt,
                                         x0=x0_new,
                                         θ_thrust_max=theta,
-                                        θ_glidescope=glide,
+                                        θ_glideslope=glide,
                                         integration=Exponential)
 
 solver = ALTROSolver(prob_altro_cold, opts, show_summary=true)

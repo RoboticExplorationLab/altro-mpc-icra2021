@@ -158,7 +158,7 @@ function RocketProblem(N=101, tf=10.0;
         cGlide = SA_F64[0, 0, α_glide, 0, 0, 0]
         glideslope = NormConstraint2(n, m, AGlide, cGlide,
                                         TO.SecondOrderCone(), :state)
-        TO.add_constraint!(cons, glideslope, 1:N-1)
+        TO.add_constraint!(cons, glideslope, 8:N-1)
     end
     # α_glide = cosd(θ_glideslope)
     # AGlide = SA_F64[
@@ -193,6 +193,13 @@ function RocketProblemMPC(prob::TO.Problem, N; kwargs...)
     prob = gen_tracking_problem(prob, N; kwargs...)
 end
 
+function sanity_check_cost(X, U, X_track, U_track, Qk, Qfk, Rk)
+    # (X-X_t)'Q(X-X_t) + (Xf-Xf_t)'Qf(Xf-Xf_t) + (U-U_t)'R(U-U_t)
+    return Qk * sum(X[1:end - 1] - X_track[1:end - 1]) +
+                                Qfk * (X[end] - X_track[end]) +
+                                Rk * sum(U - U_track)
+end
+
 function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
                             num_iters = length(Z_track) - prob_mpc.N)
     # First, Let's generate the ALTRO problem
@@ -214,7 +221,8 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         verbose=opts_mpc.verbose > 0,
         feastol=opts_mpc.constraint_tolerance,
         abstol=opts_mpc.cost_tolerance,
-        reltol=opts_mpc.cost_tolerance
+        reltol=opts_mpc.cost_tolerance,
+        max_iter=1e6
     )
 
     n,m = size(prob_mpc)
@@ -289,15 +297,21 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         err_x0[i,1] = norm(X_altro[:,1] - x0)
         err_x0[i,2] = norm(X_ecos_eval[:,1] - x0)
 
-        if mod(i, 50) == 0
+        if err_traj[i,1] > 1e-2 # mod(i, 10) == 0 &&
             println("Iteration $i")
             plot_3setRef(states(altro), X_ecos,
                     states(Z_track)[k_mpc:k_mpc + prob_mpc.N - 1],
                     title = "Position between ALTRO and ECOS at iter $i")
-            plot_3setRef(controls(altro), U_ecos,
-                    controls(Z_track)[k_mpc:k_mpc + prob_mpc.N - 2],
-                    title = "Controls between ALTRO and ECOS at iter $i")
+
+            # println("ALTRO cost = $(altro.stats.cost[end])")
+            # println("ECOS cost  = $(ecos_optimizer.sol.objective_value)")
+            # plot_3setRef(controls(altro), U_ecos,
+            #         controls(Z_track)[k_mpc:k_mpc + prob_mpc.N - 2],
+            #         title = "Controls between ALTRO and ECOS at iter $i")
         end
+
+        println("ALTRO cost = $(altro.stats.cost[end])")
+        println("ECOS cost  = $(ecos_optimizer.sol.objective_value)")
 
     end
     return X_traj, X_ecos, U_ecos, Dict(:time=>times, :iter=>iters,

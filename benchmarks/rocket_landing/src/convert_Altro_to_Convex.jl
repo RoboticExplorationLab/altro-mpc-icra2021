@@ -102,7 +102,7 @@ function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
                         Rk * sumsquares(U)
     end
 
-    Z = [vec([X[:,1:end-1]; U]); X[:,N]]
+    # Z = [vec([X[:,1:end-1]; U]); X[:,N]]
     # objective = quadform(Z, P) + dot(Z,q)
     prob_ecos = minimize(objective)
 
@@ -175,7 +175,7 @@ function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
     if !isempty(inds)
         glideslope = prob_copy.constraints[inds[1]].c[3]
         [push!(constraints, norm(X[1:2, i]) <= glideslope * X[3, i])
-                                                            for i in 1:N - 1]
+                                                            for i in 8:N - 1]
         # [push!(constraints, cosd(70) * norm(U[1:3, i]) <= U[3, i])
         #                                                     for i in 1:N - 1]
         verbose && println("Glideslope Constraint Set at inds: $inds")
