@@ -139,7 +139,7 @@ function gen_ECOS_Rocket(prob_altro::TrajectoryOptimization.Problem,
         verbose && println("Goal Constraint Set")
     end
 
-    # Third up is the ground constraint
+    # Third up is the ground constraint (Glideslope is used instead)
     # inds = get_constraint_from_type(prob_copy.constraints,
     #                                     BoundConstraint{1,n + m,Float64})
     # ground_level = prob_copy.constraints[inds[1]].z_min[3]

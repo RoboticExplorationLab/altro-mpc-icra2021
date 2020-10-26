@@ -91,7 +91,7 @@ function RocketProblem(N=101, tf=10.0;
     =#
     include_goal && TO.add_constraint!(cons, GoalConstraint(xf), N)
 
-    # Floor Constraint
+    # Floor Constraint (Irrelevant if glideslope is used)
     #=
     This prevents trajectories that go in the ground. This is sufficient for
     flat locals, such as oceans, but not more complex locations.
@@ -139,7 +139,7 @@ function RocketProblem(N=101, tf=10.0;
         TO.add_constraint!(cons, maxAngle, 1:N-1)
     end
 
-    # Glideslope Constraint
+    # Glideslope Constraint (safer and more robust than a floor constraint)
     #=
     This prevents trajectories that drifts near the surface (which is a safety
     risk). As we make the that angle larger, the constraint is more lenient.
@@ -161,16 +161,6 @@ function RocketProblem(N=101, tf=10.0;
                                         TO.SecondOrderCone(), :state)
         TO.add_constraint!(cons, glideslope, glide_recover_k:N-1)
     end
-    # α_glide = cosd(θ_glideslope)
-    # AGlide = SA_F64[
-    #     1 0 0;
-    #     0 1 0;
-    #     0 0 1
-    # ]
-    # cGlide = SA_F64[0, 0, 1/α_glide]
-    # glideslope = NormConstraint2(n, m, AGlide, cGlide,
-    #                                 TO.SecondOrderCone(), :control)
-    # TO.add_constraint!(cons, glideslope, 1:N-1)
 
     """
     Problem
@@ -194,6 +184,7 @@ function RocketProblemMPC(prob::TO.Problem, N; kwargs...)
     prob = gen_tracking_problem(prob, N; kwargs...)
 end
 
+# Simple LQR Cost Function for debugging
 function sanity_check_cost(X, U, X_track, U_track,
                                 Qk = 1,
                                 Qfk = 1,
@@ -212,6 +203,7 @@ function sanity_check_cost(X, U, X_track, U_track,
     return xCost + xfCost + uCost
 end
 
+# To enforce glideslope, if necessary
 function get_circle_proj(x, y, rad)
     @assert rad > 0
 
@@ -253,15 +245,18 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         feastol=opts_mpc.constraint_tolerance,
         abstol=opts_mpc.cost_tolerance,
         reltol=opts_mpc.cost_tolerance,
-        max_iter=1e6
+        max_iter=1e6 # Can alternatively be derived from ALTRO settings
     )
 
+    # Get the problem state size and control size
     n,m = size(prob_mpc)
 
     t0 = 0
     k_mpc = 1
     x0 = SVector(prob_mpc.x0)
     X_traj = [copy(x0) for k = 1:num_iters+1]
+
+    # Begin the MPC LOOP
     for i = 1:num_iters
         # Update initial time
         t0 += dt
@@ -274,6 +269,9 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         # x0 += (@SVector randn(n)) * norm(x0,Inf) / 100  # 1% noise
         # noise = @SVector [d for d in [randn(3); zeros(3)]]
         # x0 += noise * norm(x0,Inf) / 100  # 1% noise
+
+        # Position and Velocity separated since the magnitudes are not
+        # necessarily on par.
         noise_pos = @SVector randn(3)
         noise_vel = @SVector randn(3)
 
@@ -282,6 +280,8 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
 
         x0 += [noise_pos * pos_norm; noise_vel * vel_norm]
 
+        # To enforce the glideslope. (If the glideslope is used for 1:N, it
+        # will notice an infeasible problem and return a nonsensical trajectory)
         # rad_lim = tand(45) * x0[3]
         # xy_new = 0.9999 .* get_circle_proj(x0[1], x0[2], rad_lim)
         #
@@ -292,13 +292,17 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         if angle > 45
             println("Iter $i : Angle = $angle")
         end
+
         # To assert that the error does not drive the rocket into the ground.
+        # This is not needed with the glideslope constraint since it leaves
+        # margin for this sort of recovery.
         # x0_NoGround = [x for x in [x0[1:2]..., max(x0[3], 0.0), x0[4:6]...]]
         #
         # if x0 != x0_NoGround
         #     println("Iter $i : x0 = $x0 && x0_NoGround = $x0_NoGround")
         # end
 
+        # Update the initial state after the dynamics are propogated.
         TO.set_initial_state!(prob_mpc, x0)
         X_traj[i+1] = x0
 
@@ -319,14 +323,16 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         Altro.solve!(altro)
         Convex.solve!(ecos, ecos_optimizer)
 
+        # Log the results and performance
         iters[i,1] = iterations(altro)
-        # iters[i,2] = res.info.iter
-        # times[i,1] = median(b).time * 1e-6
+        # iters[i,2] = res.info.iter # Unclear how to access ECOS iterations
+
+        # ALTRO in ms and ECOS in s, by default
         times[i,1] = altro.stats.tsolve
         times[i,2] = ecos_optimizer.sol.solve_time * 1000
 
         # compare the solutions....
-        # Grab the X and U trajectories from ALTRO
+        # Grab the X and U trajectories from ALTRO in an ECOS friendly format
         X_altro = getX_toECOS(get_trajectory(altro))
         U_altro = getU_toECOS(get_trajectory(altro))
         # Grab the X and U trajectories from ECOS
@@ -338,18 +344,22 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         err_traj[i,1] = norm(X_altro - X_ecos_eval, Inf)
         err_traj[i,2] = norm(U_altro - U_ecos_eval, Inf)
 
+        # Determine if ECOS did not reach the optimal solution
         ecos_not_optimal = ecos.status != Convex.MathOptInterface.OPTIMAL
 
         # Get the Euclidean norm beteen the initial states.
         err_x0[i,1] = norm(X_altro[:,1] - x0)
         err_x0[i,2] = norm(X_ecos_eval[:,1] - x0)
 
+        # If the error between the trajectories are large, print and plot for
+        # debugging.
         if err_traj[i,1] > 1e-2 || ecos_not_optimal
             println("Iteration $i: State Error = $(err_traj[i,1])")
             plot_3setRef(states(altro), X_ecos,
                     states(Z_track)[k_mpc:k_mpc + prob_mpc.N - 1],
                     title = "Position between ALTRO and ECOS at iter $i")
 
+            # If you also want to debug with the contorls, use the code below
             # println("ALTRO cost = $(altro.stats.cost[end])")
             # println("ECOS cost  = $(ecos_optimizer.sol.objective_value)")
             # plot_3setRef(controls(altro), U_ecos,
@@ -357,17 +367,23 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
             #         title = "Controls between ALTRO and ECOS at iter $i")
         end
 
+        # Check that the costs between the two trajectories are on par.
+        xinds = k_mpc:(k_mpc + prob_mpc.N - 1)
+        uinds = k_mpc:(k_mpc + prob_mpc.N - 2)
         altro_cost = sanity_check_cost(X_altro, U_altro,
-                                reformat_X_track, reformat_U_track,
+                                reformat_X_track[:, xinds], reformat_U_track[:, uinds],
                                 Qk, Qfk, Rk)
         ecos_cost  = sanity_check_cost(X_ecos_eval, U_ecos_eval,
-                                reformat_X_track, reformat_U_track,
+                                reformat_X_track[:, xinds], reformat_U_track[:, uinds],
                                 Qk, Qfk, Rk)
-        ref_cost   = sanity_check_cost(reformat_X_track, reformat_U_track,
-                                reformat_X_track, reformat_U_track,
+        ref_cost   = sanity_check_cost(reformat_X_track[:, xinds],
+                                reformat_U_track[:, uinds],
+                                reformat_X_track[:, xinds],
+                                reformat_U_track[:, uinds],
                                 Qk, Qfk, Rk)
         cost_diff  = altro_cost - ecos_cost
 
+        # If the costs are far off, return the information below for debugging
         if cost_diff > 1e-3 || ecos_not_optimal
             println("Iteration $i: ")
             println("ALTRO cost                = $altro_cost")
@@ -375,12 +391,17 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
             println("Cost Difference (~ zero)  = $(altro_cost - ecos_cost)")
         end
 
+        # This serves as a control for the above check.
         if ref_cost != 0.0
             println("Iteration $i: ")
             println("Ref cost (should be zero) = $ref_cost")
         end
 
     end
+
+    # Return the trajectory that was traced out by the MPC
+    # X_ecos and U_ecos are needed to grab the ECOS variable information
+    # All other logistics are in the dictionary.
     return X_traj, X_ecos, U_ecos, Dict(:time=>times, :iter=>iters,
                                 :err_traj=>err_traj, :err_x0=>err_x0)
 end
