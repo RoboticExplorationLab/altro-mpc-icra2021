@@ -120,3 +120,17 @@ xlabel!("Iterations")
 ylabel!("Time (ms)")
 title!("Solve Time between ALTRO and ECOS over Iterations")
 display(time_plt)
+
+
+xs = getArrAtInd(X, 1)
+ys = getArrAtInd(X, 2)
+zs = getArrAtInd(X, 3)
+
+laterals = [norm([xs[i]; ys[i]]) for i in 1:length(xs)]
+angle = atand.(laterals, zs)
+
+angle_plt = plot(angle, label = "Angle", legend = :bottomright)
+hline!([glide], label = "Glideslope Limit", linestyle = :dash, color = :grey)
+xlabel!("Iterations")
+ylabel!("Angle (deg)")
+title!("Slope Angle over Trajectory")

@@ -52,7 +52,7 @@ function RocketProblem(N=101, tf=10.0;
         perWeightMax = 2.0,
         θ_thrust_max = 7.0,  # deg
         θ_glideslope = 60.0, # deg
-        glide_recover_k = 20,
+        glide_recover_k = 8,
         include_goal = true,
         integration=RD.Exponential
     )
@@ -212,6 +212,18 @@ function sanity_check_cost(X, U, X_track, U_track,
     return xCost + xfCost + uCost
 end
 
+function get_circle_proj(x, y, rad)
+    @assert rad > 0
+
+    mag = norm([x; y])
+    if mag < rad
+        return x, y
+    end
+
+    return (rad / mag) .* (x, y)
+end
+
+
 function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
                             num_iters = length(Z_track) - prob_mpc.N)
     # First, Let's generate the ALTRO problem
@@ -270,9 +282,16 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
 
         x0 += [noise_pos * pos_norm; noise_vel * vel_norm]
 
+        # rad_lim = tand(45) * x0[3]
+        # xy_new = 0.9999 .* get_circle_proj(x0[1], x0[2], rad_lim)
+        #
+        # x0 = @SVector [xy_new[1], xy_new[2], x0[3], x0[4], x0[5], x0[6]]
+
         lateral = norm(x0[1:2])
         angle = atand(lateral, x0[3])
-        println("Iter $i : Angle = $angle")
+        if angle > 45
+            println("Iter $i : Angle = $angle")
+        end
         # To assert that the error does not drive the rocket into the ground.
         # x0_NoGround = [x for x in [x0[1:2]..., max(x0[3], 0.0), x0[4:6]...]]
         #
@@ -319,14 +338,14 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
         err_traj[i,1] = norm(X_altro - X_ecos_eval, Inf)
         err_traj[i,2] = norm(U_altro - U_ecos_eval, Inf)
 
-        println("State Error = $(err_traj[i,1])")
+        ecos_not_optimal = ecos.status != Convex.MathOptInterface.OPTIMAL
 
         # Get the Euclidean norm beteen the initial states.
         err_x0[i,1] = norm(X_altro[:,1] - x0)
         err_x0[i,2] = norm(X_ecos_eval[:,1] - x0)
 
-        if err_traj[i,1] > 1e-2 # mod(i, 10) == 0 &&
-            println("Iteration $i")
+        if err_traj[i,1] > 1e-2 || ecos_not_optimal
+            println("Iteration $i: State Error = $(err_traj[i,1])")
             plot_3setRef(states(altro), X_ecos,
                     states(Z_track)[k_mpc:k_mpc + prob_mpc.N - 1],
                     title = "Position between ALTRO and ECOS at iter $i")
@@ -349,13 +368,15 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track,
                                 Qk, Qfk, Rk)
         cost_diff  = altro_cost - ecos_cost
 
-        if cost_diff > 1
+        if cost_diff > 1e-3 || ecos_not_optimal
+            println("Iteration $i: ")
             println("ALTRO cost                = $altro_cost")
             println("ECOS cost                 = $ecos_cost")
             println("Cost Difference (~ zero)  = $(altro_cost - ecos_cost)")
         end
 
         if ref_cost != 0.0
+            println("Iteration $i: ")
             println("Ref cost (should be zero) = $ref_cost")
         end
 

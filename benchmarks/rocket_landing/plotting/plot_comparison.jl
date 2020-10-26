@@ -120,17 +120,17 @@ function plot_glide_angle(a, e, ref, offset = 0;
     var_e_lat = [norm([var_e1[i]; var_e2[i]]) for i in 1:length(var_e1)]
     var_ref_lat = [norm([var_ref1[i]; var_ref2[i]]) for i in 1:length(var_ref1)]
 
-    println("Size a -> $(size(var_a_lat))")
-    println("Size e -> $(size(var_e_lat))")
-    println("Size ref -> $(size(var_ref_lat))")
-
-    println("Size a -> $(size(var_a3))")
-    println("Size e -> $(size(var_e3))")
-    println("Size ref -> $(size(var_ref3))")
-
-    println("Max a -> $(maximum(var_a_lat))")
-    println("Max e -> $(maximum(var_e_lat))")
-    println("Max ref -> $(maximum(var_ref_lat))")
+    # println("Size a -> $(size(var_a_lat))")
+    # println("Size e -> $(size(var_e_lat))")
+    # println("Size ref -> $(size(var_ref_lat))")
+    #
+    # println("Size a -> $(size(var_a3))")
+    # println("Size e -> $(size(var_e3))")
+    # println("Size ref -> $(size(var_ref3))")
+    #
+    # println("Max a -> $(maximum(var_a_lat))")
+    # println("Max e -> $(maximum(var_e_lat))")
+    # println("Max ref -> $(maximum(var_ref_lat))")
 
     m1 = slope(theta)
     max_x = max(maximum(var_a_lat), maximum(var_e_lat), maximum(var_ref_lat))
