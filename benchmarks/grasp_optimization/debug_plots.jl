@@ -1,12 +1,12 @@
 using Plots
-altro_traj = results[1][2]
-ecos_controls = results[1][3]
+# altro_traj = results[1][2]
+# ecos_controls = results[1][3]
 
 X = altro_traj[:states]
 U = altro_traj[:controls]
 Ue = ecos_controls
-Uc = controls(prob_cold)[1:18]
-N = 15
+Uc = controls(prob_cold)
+N = num_iters
 
 ## COMPARE F1
 u1 = [U[t][1] for t = 1:N-1]

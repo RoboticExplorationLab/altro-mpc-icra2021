@@ -9,11 +9,11 @@ o = SquareObject()
 prob_cold = GraspProblem(o)
 opts = SolverOptions(
     verbose = 0,
-    projected_newton_tolerance=1e-4,
-    cost_tolerance_intermediate=1e-4,
+    projected_newton_tolerance=1e-5,
+    cost_tolerance_intermediate=1e-5,
     penalty_scaling=10.,
     penalty_initial=1.0,
-    constraint_tolerance=1e-4
+    constraint_tolerance=1e-5
 )
 altro = ALTROSolver(prob_cold, opts)
 Altro.solve!(altro)
@@ -22,7 +22,7 @@ Altro.solve!(altro)
 Z_track = get_trajectory(altro)
 
 # MPC Setup
-num_iters = 20 # number of MPC iterations
+num_iters = 1 # number of MPC iterations
 N_mpc = 10 # length of the MPC horizon in number of steps
 
 Q = prob_cold.obj[1].Q[1]
@@ -32,6 +32,7 @@ Qf = prob_cold.obj[end].Q[1]
 prob_mpc = gen_tracking_problem(prob_cold, N_mpc, Qk = Q, Rk = R, Qfk = Qf)
 
 function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20)
+    n, m, N_mpc = size(prob_mpc)
     x0 = state(Z_track[1])
     u0 = control(Z_track[1])
 
@@ -50,13 +51,16 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20)
 
     # ecos solver
     ecos = ECOS.Optimizer(verbose=0,
-                        feastol=opts_mpc.constraint_tolerance,
-                        abstol=opts_mpc.cost_tolerance,
-                        reltol=opts_mpc.cost_tolerance)
+                        feastol=1e-8,
+                        abstol=1e-8,
+                        reltol=1e-8)
+                        # feastol=opts_mpc.constraint_tolerance,
+                        # abstol=opts_mpc.cost_tolerance,
+                        # reltol=opts_mpc.cost_tolerance)
 
     for iter in 1:num_iters
         # Updates prob_mpc in place, returns an equivalent ecos problem
-        prob_mpc_ecos, U_ecos = mpc_update!(prob_mpc, o, iter, Z_track)
+        prob_mpc_ecos, X_ecos, U_ecos = mpc_update!(prob_mpc, o, iter, Z_track)
 
         # TODO Shift the multipliers and penalties
         # Altro.shift_fill!(TO.get_constraints(altro))
@@ -65,16 +69,24 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20)
         Altro.solve!(altro)
 
         # Solve Ecos
-        # b_ecos = @benchmark Convex.solve!($prob_mpc_ecos, $ecos) samples=1 evals=1
-        Convex.solve!(prob_mpc_ecos, ecos)
+        # Convex.solve!(prob_mpc_ecos, ecos)
+        JuMP.set_optimizer(prob_mpc_ecos, ()->ecos)
+        JuMP.optimize!(prob_mpc_ecos)
+
+        # Compute max infinity norm diff
+        diffs = []
+        X = [value.(X_ecos[:,i]) for i in 1:N_mpc]
+        U = [value.(U_ecos[:,i]) for i in 1:N_mpc-1]
+        xdiff = maximum(norm.(X - states(altro), Inf))
+        udiff = maximum(norm.(U - controls(altro), Inf))
 
         # Printouts
         println("Timestep $iter")
         print("ALTRO runtime: $(round(altro.stats.tsolve, digits=2)) ms")
         println("\t Max violation: $(TrajectoryOptimization.max_violation(altro))")
         print("ECOS runtime: $(round(1000*ecos.sol.solve_time, digits=2)) ms")
-        println("\tStatus: ", prob_mpc_ecos.status)
-        println("Control diff = ", round(norm(control(prob_mpc.Z[1]) - U_ecos.value[:, 1]), digits=2))
+        println("\tStatus: ", termination_status(prob_mpc_ecos)) # prob_mpc_ecos.status)
+        println("State diff = ", round(xdiff, digits=2), "\tControl diff = ", round(udiff, digits=2))
 
         # Update arrays
         altro_times[iter] = altro.stats.tsolve
@@ -82,7 +94,7 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20)
         altro_states[iter+1] = state(prob_mpc.Z[1])
         altro_controls[iter] = control(prob_mpc.Z[1])
         ecos_times[iter] = 1000*ecos.sol.solve_time
-        ecos_controls[iter] = U_ecos.value[:, 1]
+        ecos_controls[iter] = value.(U_ecos)[:, 1] #U_ecos.value[:, 1]
     end
 
     altro_traj = Dict(:states=>altro_states, :controls=>altro_controls)
@@ -96,7 +108,7 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20)
 end
 
 ## Test single run
-# res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts, Z_track, num_iters)
+res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts, Z_track, num_iters)
 
 ## Plot Timing Results
 # using Plots

@@ -1,7 +1,7 @@
 import Pkg; Pkg.activate(joinpath(@__DIR__,"..")); Pkg.instantiate()
 
 using BenchmarkTools
-using Convex, ECOS
+using JuMP, ECOS
 using TrajectoryOptimization, Altro
 const TO = TrajectoryOptimization
 using RobotDynamics
