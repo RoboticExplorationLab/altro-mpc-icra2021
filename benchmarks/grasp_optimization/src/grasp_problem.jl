@@ -59,7 +59,7 @@ function GraspProblem(o::SquareObject, N = 61, tf = 6.0,
     end
 
     # Problem
-    prob = TO.Problem(o, obj, xf, tf, x0=SVector{n}(x0), constraints=conSet);
+    prob = TO.Problem(o, obj, xf, tf, x0=SVector{n}(x0), constraints=conSet, integration=RD.PassThrough);
 
     # Intialize Trajectory
     u0 = @SVector [0, -1.5, o.mass*9.81/2, 0, 1.5, o.mass*9.81/2]

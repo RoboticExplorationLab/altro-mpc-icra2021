@@ -45,11 +45,11 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; print_all=tr
     ecos_times = zeros(num_iters)
     ecos_controls = copy(altro_controls)
 
-    # altro solver
+    # ALTRO solver
     altro = ALTROSolver(prob_mpc, opts_mpc)
     set_options!(altro, show_summary=false, verbose=0)
 
-    # ecos solver
+    # ECOS solver
     ecos = ECOS.Optimizer(verbose=0,
                         feastol=opts_mpc.constraint_tolerance,
                         abstol=opts_mpc.cost_tolerance,
@@ -59,8 +59,13 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; print_all=tr
         # Updates prob_mpc in place, returns an equivalent ecos problem
         prob_mpc_ecos, X_ecos, U_ecos = mpc_update!(prob_mpc, o, iter, Z_track)
 
-        # TODO Shift the multipliers and penalties
-        # Altro.shift_fill!(TO.get_constraints(altro))
+        # Shift the multipliers and penalties
+        ConVals = TO.get_constraints(altro).convals
+        Altro.shift_fill!(ConVals[2]) # dynamics
+        for i in (2 .+ (1:4*(N_mpc-1))) # stage constraints
+            ConVals[i].μ[1] = ConVals[i+4].μ[1]
+            ConVals[i].λ[1] = ConVals[i+4].λ[1]
+        end
 
         # Solve Altro
         Altro.solve!(altro)
@@ -82,7 +87,7 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; print_all=tr
             print("ALTRO runtime: $(round(altro.stats.tsolve, digits=2)) ms")
             println("\t Max violation: $(TrajectoryOptimization.max_violation(altro))")
             print("ECOS runtime: $(round(1000*ecos.sol.solve_time, digits=2)) ms")
-            println("\tStatus: ", termination_status(prob_mpc_ecos)) # prob_mpc_ecos.status)
+            println("\tStatus: ", termination_status(prob_mpc_ecos))
             println("State diff = ", round(xdiff, digits=2), "\tControl diff = ", round(udiff, digits=2))
         end
 
@@ -92,7 +97,7 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; print_all=tr
         altro_states[iter+1] = state(prob_mpc.Z[1])
         altro_controls[iter] = control(prob_mpc.Z[1])
         ecos_times[iter] = 1000*ecos.sol.solve_time
-        ecos_controls[iter] = value.(U_ecos)[:, 1] #U_ecos.value[:, 1]
+        ecos_controls[iter] = value.(U_ecos)[:, 1]
     end
 
     altro_traj = Dict(:states=>altro_states, :controls=>altro_controls)
@@ -106,10 +111,10 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; print_all=tr
 end
 
 ## Test single run
-# num_iters = 20
-# print_all = true
-# res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts, Z_track,
-#                                             num_iters, print_all=print_all)
+num_iters = 20
+print_all = true
+res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts, Z_track,
+                                            num_iters, print_all=print_all)
 
 ## Histogram of timing results
 # altro_times = res[:time][:,1]

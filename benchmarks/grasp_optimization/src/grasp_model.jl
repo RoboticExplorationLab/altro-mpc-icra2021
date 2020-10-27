@@ -82,7 +82,7 @@ function RobotDynamics.discrete_dynamics(::Type{PassThrough}, model::SquareObjec
     qd = x[SA[4,5,6]]
 
     F1 = u[SA[1,2,3]]
-    F2 = u[SA[1,2,3]]
+    F2 = u[SA[4,5,6]]
     u = 1/m * (F1 + F2) + g
 
     q⁺ = q + qd*dt + .5*u*dt^2
