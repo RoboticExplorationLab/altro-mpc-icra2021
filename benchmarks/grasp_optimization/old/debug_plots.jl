@@ -9,12 +9,15 @@ Uc = controls(prob_cold)
 N = num_iters
 
 ## COMPARE F1
+# altro
 u1 = [U[t][1] for t = 1:N-1]
 u2 = [U[t][2] for t = 1:N-1]
 u3 = [U[t][3] for t = 1:N-1]
+# ecos
 u1e = [Ue[t][1] for t = 1:N-1]
 u2e = [Ue[t][2] for t = 1:N-1]
 u3e = [Ue[t][3] for t = 1:N-1]
+# cold solve
 u1c = [Uc[t][1] for t = 1:N-1]
 u2c = [Uc[t][2] for t = 1:N-1]
 u3c = [Uc[t][3] for t = 1:N-1]

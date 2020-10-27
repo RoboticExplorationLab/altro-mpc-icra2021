@@ -14,7 +14,7 @@ mutable struct SquareObject{T} <: AbstractModel
     p::Array    # position vectors of contacts wrt object
     v::Array    # inward pointing surface normals at contacts
     B::Array    # skew matrices for computing torques
-    θ::Array  # orientation trajectory
+    θ::Array    # orientation trajectory
     θdd::Array  # angular acceleration trajectory
 end
 
@@ -88,5 +88,5 @@ function RobotDynamics.discrete_dynamics(::Type{PassThrough}, model::SquareObjec
     q⁺ = q + qd*dt + .5*u*dt^2
     qd⁺ = qd + u*dt
 
-    return [q⁺; qd⁺] 
+    return [q⁺; qd⁺]
 end

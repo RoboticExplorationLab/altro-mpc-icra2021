@@ -55,11 +55,9 @@ function TO.change_dimension(con::NormConstraint2, n::Int, m::Int, ix=1:n, iu=1:
 	NormConstraint2(n, m, con.val, con.sense, ix[con.inds])
 end
 
-
 """
-mutable linear constraint
+LinearConstraint with mutable b vector
 """
-
 struct LinearConstraint2{S,P,W,T} <: StageConstraint
 	n::Int
 	m::Int

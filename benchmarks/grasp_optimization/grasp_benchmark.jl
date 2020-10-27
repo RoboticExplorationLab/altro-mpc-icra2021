@@ -7,9 +7,10 @@ const TO = TrajectoryOptimization
 using RobotDynamics
 const RD = RobotDynamics
 using JLD2
+using Plots
 
-include("grasp_mpc.jl")
-include("src/plotting.jl")
+include("grasp_mpc.jl") # Run cold solve and set up MPC tracking problem
+include("src/plotting.jl") # Function for comparison box plots
 
 # Run Benchmark
 println("Starting MPC Benchmark...")
