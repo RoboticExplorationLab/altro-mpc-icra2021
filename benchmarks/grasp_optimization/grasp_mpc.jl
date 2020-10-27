@@ -59,14 +59,6 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; print_all=tr
         # Updates prob_mpc in place, returns an equivalent ecos problem
         prob_mpc_ecos, X_ecos, U_ecos = mpc_update!(prob_mpc, o, iter, Z_track)
 
-        # Shift the multipliers and penalties
-        ConVals = TO.get_constraints(altro).convals
-        Altro.shift_fill!(ConVals[2]) # dynamics
-        for i in (2 .+ (1:4*(N_mpc-1))) # stage constraints
-            ConVals[i].μ[1] = ConVals[i+4].μ[1]
-            ConVals[i].λ[1] = ConVals[i+4].λ[1]
-        end
-
         # Solve Altro
         Altro.solve!(altro)
 
@@ -104,17 +96,17 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; print_all=tr
     res = Dict(:time=>[altro_times ecos_times], :iter=>altro_iters)
 
     # Print Solve Time Difference
-    ave_diff = (sum(ecos_times) - sum(altro_times))/length(altro_times)
+    ave_diff = mean(ecos_times) - mean(altro_times)
     println("\nAverage ALTRO solve time was $(round(ave_diff, digits=2)) ms faster than that of ECOS\n")
 
     return res, altro_traj, ecos_controls
 end
 
 ## Test single run
-num_iters = 20
-print_all = true
-res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts, Z_track,
-                                            num_iters, print_all=print_all)
+# num_iters = 20
+# print_all = true
+# res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts, Z_track,
+#                                             num_iters, print_all=print_all)
 
 ## Histogram of timing results
 # altro_times = res[:time][:,1]
