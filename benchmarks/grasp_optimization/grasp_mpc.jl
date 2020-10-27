@@ -31,7 +31,7 @@ Qf = prob_cold.obj[end].Q[1]
 
 prob_mpc = gen_tracking_problem(prob_cold, N_mpc, Qk = Q, Rk = R, Qfk = Qf)
 
-function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; verbose=true)
+function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; print_all=true)
     n, m, N_mpc = size(prob_mpc)
     x0 = state(Z_track[1])
     u0 = control(Z_track[1])
@@ -78,7 +78,7 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; verbose=true
         udiff = maximum(norm.(U - controls(altro), Inf))
 
         # Printouts
-        if verbose
+        if print_all
             println("Timestep $iter")
             print("ALTRO runtime: $(round(altro.stats.tsolve, digits=2)) ms")
             println("\t Max violation: $(TrajectoryOptimization.max_violation(altro))")
@@ -86,7 +86,7 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; verbose=true
             println("\tStatus: ", termination_status(prob_mpc_ecos)) # prob_mpc_ecos.status)
             println("State diff = ", round(xdiff, digits=2), "\tControl diff = ", round(udiff, digits=2))
         end
-        
+
         # Update arrays
         altro_times[iter] = altro.stats.tsolve
         altro_iters[iter] = iterations(altro)
@@ -101,7 +101,7 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; verbose=true
 
     # Print Solve Time Difference
     ave_diff = (sum(ecos_times) - sum(altro_times))/length(altro_times)
-    println("Average ALTRO solve time was $(round(ave_diff, digits=2)) ms faster than that of ECOS")
+    println("\nAverage ALTRO solve time was $(round(ave_diff, digits=2)) ms faster than that of ECOS\n")
 
     return res, altro_traj, ecos_controls
 end

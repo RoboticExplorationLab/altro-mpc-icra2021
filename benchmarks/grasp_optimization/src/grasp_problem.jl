@@ -3,9 +3,9 @@ Generate grasp problem with LQR objective
 """
 function GraspProblem(o::SquareObject, N = 61, tf = 6.0,
                     x0 = [0.,3.,3.,0.,0.,0.], # initial position
-                    xf = zeros(n) # final position
+                    xf = zeros(6) # final position
                     )
-                    
+
     n, m = size(o)  # state and control size
     dt = tf/(N-1)   # time step
 

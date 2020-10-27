@@ -13,15 +13,16 @@ include("src/plotting.jl")
 
 # Run Benchmark
 println("Starting MPC Benchmark...")
-Ns = [10, 15, 25, 30, 35]
+Ns = [10, 15, 20, 25, 30, 35]
 results = map(Ns) do N_mpc
     println("Running with $N_mpc knot points...")
     prob_mpc = gen_tracking_problem(prob_cold, N_mpc, Qk = Q, Rk = R, Qfk = Qf)
-    run_grasp_mpc(prob_mpc, opts, Z_track, verbose=false)
+    run_grasp_mpc(prob_mpc, opts, Z_track, print_all=false)
 end
 
 # Save Results
 @save string(@__DIR__,"/grasp_benchmark_data.jld2") results Ns
+@load string(@__DIR__,"/grasp_benchmark_data.jld2") results Ns
 
 # Generate Plots
 timing_results = [results[i][1] for i=1:length(Ns)]

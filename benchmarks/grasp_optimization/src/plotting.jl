@@ -3,8 +3,8 @@ colors = (altro=colorant"red", ecos=colorant"blue")
 
 ## Generate Plots
 function comparison_plot(results, Ns, xlabel;
-        shift=4,
-        width=6,
+        shift=0,
+        width=2,
         ymode="linear"
     )
     altro = map(zip(Ns,results)) do (N,res)
@@ -40,6 +40,6 @@ function comparison_plot(results, Ns, xlabel;
         ecos...,
         PlotInc({"red","dashed","no marks", "very thick"}, Coordinates(Ns .- shift, altro_avg)),
         PlotInc({"blue","dashed","no marks", "very thick"}, Coordinates(Ns .+ shift, ecos_avg)),
-        Legend("ALTRO","OSQP")
+        Legend("ALTRO","ECOS")
     ))
 end
