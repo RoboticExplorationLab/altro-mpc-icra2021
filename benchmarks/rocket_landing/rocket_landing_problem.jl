@@ -6,6 +6,7 @@ using Altro
 using TrajectoryOptimization
 const TO = TrajectoryOptimization
 using StaticArrays
+using Rotations: skew
 
 """
 Build the continuous time linear rocket model, given the mass and angular
@@ -17,11 +18,11 @@ function RocketModel(mass, grav, dt, ωPlanet = [0.0; 0.0; 0.0];
                                                 integration=RD.Exponential)
     A = [
         zeros(3,3)      I(3);
-        -S(ωPlanet)^2   -2*S(ωPlanet);
+        -skew(ωPlanet)^2   -2*skew(ωPlanet);
     ]
     B = [
         zeros(3,3);
-        -1/mass * I(3)
+        1/mass * I(3)
     ]
     d = [
         zeros(3);
@@ -54,6 +55,8 @@ function RocketProblem(N=101, tf=10.0;
         θ_glideslope = 60.0, # deg
         glide_recover_k = 8,
         include_goal = true,
+        include_thrust_angle = true,
+        include_glideslope = true,
         integration=RD.Exponential
     )
     """
@@ -115,6 +118,7 @@ function RocketProblem(N=101, tf=10.0;
     if true
         @assert perWeightMax > 1
         u_bnd = mass * abs(grav[3]) * perWeightMax
+        @show u_bnd
         maxThrust = NormConstraint(n, m, u_bnd, TO.SecondOrderCone(), :control)
         TO.add_constraint!(cons, maxThrust, 1:N-1)
     end
@@ -126,7 +130,7 @@ function RocketProblem(N=101, tf=10.0;
     We write this as || [u_x; u_y] || ≤ tan(θ) u_z
     To write this in the SOCP form of ||Ax|| ≤ c'x, we take the A and c below.
     =#
-    if true
+    if include_thrust_angle 
         α_max = getalpha(θ_thrust_max)
         ARocket = SA_F64[
             1 0 0;
@@ -146,7 +150,7 @@ function RocketProblem(N=101, tf=10.0;
     The angle cannot be larger than 90 deg.
     =#
 
-    if true
+    if include_glideslope 
         α_glide = getalpha(θ_glideslope)
         AGlide = SA_F64[
             1 0 0 0 0 0;
@@ -173,7 +177,7 @@ function RocketProblem(N=101, tf=10.0;
     We can immediately warm start the solution using a hover, which is the
     exact force to balance gravity (mg).
     =#
-    U0 = [mass * grav for k = 1:N-1]
+    U0 = [-mass * grav for k = 1:N-1]
     initial_controls!(prob, U0)
     rollout!(prob)
 
