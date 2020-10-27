@@ -1,19 +1,19 @@
 include("src/grasp_model.jl")       # defines model
-include("src/grasp_problem.jl")     # defines problem
+include("src/grasp_problem.jl")     # defines LQR problem
 include("src/new_constraints.jl")   # defines additional constraints
-include("src/grasp_mpc_helpers.jl") # defines mpc_update! and gen_ECOS
-include("../mpc.jl")                # defines gen_tracking_problem
+include("src/grasp_mpc_helpers.jl") # defines mpc_update!() and gen_ECOS()
+include("../mpc.jl")                # defines tracking problem
 
 # Generate and solve reference problem
 o = SquareObject()
 prob_cold = GraspProblem(o)
 opts = SolverOptions(
     verbose = 0,
-    projected_newton_tolerance=1e-5,
-    cost_tolerance_intermediate=1e-5,
+    projected_newton_tolerance=1e-4,
+    cost_tolerance_intermediate=1e-4,
     penalty_scaling=10.,
     penalty_initial=1.0,
-    constraint_tolerance=1e-5
+    constraint_tolerance=1e-4
 )
 altro = ALTROSolver(prob_cold, opts)
 Altro.solve!(altro)
@@ -22,7 +22,7 @@ Altro.solve!(altro)
 Z_track = get_trajectory(altro)
 
 # MPC Setup
-num_iters = 1 # number of MPC iterations
+num_iters = 20 # number of MPC iterations
 N_mpc = 10 # length of the MPC horizon in number of steps
 
 Q = prob_cold.obj[1].Q[1]
@@ -31,7 +31,7 @@ Qf = prob_cold.obj[end].Q[1]
 
 prob_mpc = gen_tracking_problem(prob_cold, N_mpc, Qk = Q, Rk = R, Qfk = Qf)
 
-function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20)
+function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20; verbose=true)
     n, m, N_mpc = size(prob_mpc)
     x0 = state(Z_track[1])
     u0 = control(Z_track[1])
@@ -51,12 +51,9 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20)
 
     # ecos solver
     ecos = ECOS.Optimizer(verbose=0,
-                        feastol=1e-8,
-                        abstol=1e-8,
-                        reltol=1e-8)
-                        # feastol=opts_mpc.constraint_tolerance,
-                        # abstol=opts_mpc.cost_tolerance,
-                        # reltol=opts_mpc.cost_tolerance)
+                        feastol=opts_mpc.constraint_tolerance,
+                        abstol=opts_mpc.cost_tolerance,
+                        reltol=opts_mpc.cost_tolerance)
 
     for iter in 1:num_iters
         # Updates prob_mpc in place, returns an equivalent ecos problem
@@ -81,13 +78,15 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20)
         udiff = maximum(norm.(U - controls(altro), Inf))
 
         # Printouts
-        println("Timestep $iter")
-        print("ALTRO runtime: $(round(altro.stats.tsolve, digits=2)) ms")
-        println("\t Max violation: $(TrajectoryOptimization.max_violation(altro))")
-        print("ECOS runtime: $(round(1000*ecos.sol.solve_time, digits=2)) ms")
-        println("\tStatus: ", termination_status(prob_mpc_ecos)) # prob_mpc_ecos.status)
-        println("State diff = ", round(xdiff, digits=2), "\tControl diff = ", round(udiff, digits=2))
-
+        if verbose
+            println("Timestep $iter")
+            print("ALTRO runtime: $(round(altro.stats.tsolve, digits=2)) ms")
+            println("\t Max violation: $(TrajectoryOptimization.max_violation(altro))")
+            print("ECOS runtime: $(round(1000*ecos.sol.solve_time, digits=2)) ms")
+            println("\tStatus: ", termination_status(prob_mpc_ecos)) # prob_mpc_ecos.status)
+            println("State diff = ", round(xdiff, digits=2), "\tControl diff = ", round(udiff, digits=2))
+        end
+        
         # Update arrays
         altro_times[iter] = altro.stats.tsolve
         altro_iters[iter] = iterations(altro)
@@ -102,13 +101,13 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, num_iters = 20)
 
     # Print Solve Time Difference
     ave_diff = (sum(ecos_times) - sum(altro_times))/length(altro_times)
-    println("\n Average ALTRO solve time was $(round(ave_diff, digits=2)) ms faster than that of ECOS")
+    println("Average ALTRO solve time was $(round(ave_diff, digits=2)) ms faster than that of ECOS")
 
     return res, altro_traj, ecos_controls
 end
 
 ## Test single run
-res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts, Z_track, num_iters)
+# res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts, Z_track, num_iters)
 
 ## Plot Timing Results
 # using Plots

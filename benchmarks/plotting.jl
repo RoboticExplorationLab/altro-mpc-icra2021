@@ -1,9 +1,9 @@
-using PGFPlotsX, Colors
+using PGFPlotsX, Colors, Statistics
 colors = (altro=colorant"red", osqp=colorant"blue")
 cd(joinpath(@__DIR__,".."))
 IMAGE_DIR = joinpath("figures")
-function PGFBoxPlot(x, y::Real=0, thresh=3*std(x); 
-        opts=(@pgf {}), 
+function PGFBoxPlot(x, y::Real=0, thresh=3*std(x);
+        opts=(@pgf {}),
         plot_outliers=true,
         width=6
     )
@@ -11,7 +11,7 @@ function PGFBoxPlot(x, y::Real=0, thresh=3*std(x);
     μ = mean(x)
     is_inlier = μ - thresh .< abs.(x) .< μ + thresh
     inliers = x[is_inlier]
-    outliers = x[.!is_inlier] 
+    outliers = x[.!is_inlier]
     lo = minimum(inliers)
     up = maximum(inliers)
     if plot_outliers
@@ -19,7 +19,7 @@ function PGFBoxPlot(x, y::Real=0, thresh=3*std(x);
     else
         coords = Coordinates([],[])
     end
-        
+
     @pgf PlotInc(
         {
             opts...,
@@ -33,11 +33,11 @@ function PGFBoxPlot(x, y::Real=0, thresh=3*std(x);
                 "lower quartile"=q1,
                 "median"=q2,
                 "upper quartile"=q3,
-                "upper whisker"=up, 
+                "upper whisker"=up,
                 "box extend"=width,
             },
             "mark options"={scale=.5},
-        }, 
+        },
         coords
     )
 end

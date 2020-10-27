@@ -3,12 +3,11 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
 
     # Update Initial Time
     dt = prob_mpc.Z[1].dt
-
     TO.set_initial_time!(prob_mpc, k_mpc*dt)
 
-    # Update initial state by using 1st control, and adding some noise
+    # Update Initial State (use 1st control and add some noise)
     x0 = discrete_dynamics(TO.integration(prob_mpc), prob_mpc.model, prob_mpc.Z[1])
-    # x0 += (@SVector randn(n)) * norm(x0,Inf) / 100  # 1% noise
+    x0 += (@SVector randn(n)) * norm(x0,Inf) / 100  # 1% noise
     TO.set_initial_state!(prob_mpc, x0)
 
     # Update the Reference Trajectory
@@ -20,13 +19,14 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
     # Setup ECOS
     prob_mpc_ecos, X_ecos, U_ecos = gen_ECOS(prob_mpc, k_mpc, Z_track)
     # prob_mpc_ecos.constraints += X_ecos[:,1] == x0 # Initial condition
-    @constraint(prob_mpc_ecos, X_ecos[:,1] .== x0)
+    @constraint(prob_mpc_ecos, X_ecos[:,1] .== x0) # Initial condition
 
     # Update ALTRO and ECOS Stage Constraints
     i_c = 1 # constraint index
     for i = 1:N_mpc-1
-        # for convenience
         i_s = i + k_mpc # shift index for v and B matrices
+
+        # for convenience with JuMP
         F1 = @expression(prob_mpc_ecos, U_ecos[1:3, i]) # contact force 1
         F2 = @expression(prob_mpc_ecos, U_ecos[4:6, i]) # contact force 2
 
@@ -51,7 +51,7 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
 
         i_c += 1
 
-        # SOCP friction cone 1
+        # SOCP Friction Cone 1
         v1_i = o.v[1][i_s]
         prob_mpc.constraints[i_c].A .= (I - v1_i*v1_i')
         prob_mpc.constraints[i_c].c .= o.mu*v1_i
@@ -63,7 +63,7 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
 
         i_c += 1
 
-        # SOCP friction cone 2
+        # SOCP Friction Cone 2
         v2_i = o.v[2][i_s]
         prob_mpc.constraints[i_c].A .= (I - v2_i*v2_i')
         prob_mpc.constraints[i_c].c .= o.mu*v2_i
@@ -76,8 +76,8 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
         i_c += 1
 
         # Dynamics Constraints for ECOS
+        pos_ind = 1:3; vel_ind = 4:6 # indices
         u = 1/o.mass * (F1 + F2) + o.g
-        pos_ind = 1:3; vel_ind = 4:6
         # prob_mpc_ecos.constraints += X_ecos[vel_ind, i+1] == X_ecos[vel_ind, i] + u*dt
         # prob_mpc_ecos.constraints += X_ecos[pos_ind, i+1] == X_ecos[pos_ind, i] + X_ecos[vel_ind, i]*dt + u*.5*dt^2
         @constraint(prob_mpc_ecos, X_ecos[vel_ind, i+1] .== X_ecos[vel_ind, i] + u*dt)
@@ -110,7 +110,7 @@ function gen_ECOS(prob_mpc, k_mpc, Z_track)
     X_ref = states(Z_track)[(k_mpc-1) .+ (1:N_mpc)]
     X_ref = hcat(Vector.(X_ref)...)
 
-    U_ref = states(Z_track)[(k_mpc-1) .+ (1:N_mpc-1)]
+    U_ref = controls(Z_track)[(k_mpc-1) .+ (1:N_mpc-1)]
     U_ref = hcat(Vector.(U_ref)...)
 
     # Set Tracking Objective

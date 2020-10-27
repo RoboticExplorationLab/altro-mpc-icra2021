@@ -1,13 +1,16 @@
-function GraspProblem(o::SquareObject, N = 51, tf = 5.0)
-    n, m = size(o)
+"""
+Generate grasp problem with LQR objective
+"""
+function GraspProblem(o::SquareObject, N = 61, tf = 6.0,
+                    x0 = [0.,3.,3.,0.,0.,0.], # initial position
+                    xf = zeros(n) # final position
+                    )
+                    
+    n, m = size(o)  # state and control size
     dt = tf/(N-1)   # time step
 
     # set SquareObject orientation trajectories if blank
     o.p == [] && set_orientation_traj!(o, dt, tf)
-
-    # initial and final positions
-    x0 = [0.,3.,3.,0.,0.,0.]
-    xf = zeros(n)
 
     # Indices for convenience
     pos_ind = 1:Int(n/2)
@@ -20,7 +23,6 @@ function GraspProblem(o::SquareObject, N = 51, tf = 5.0)
     Q = 1.0e-3*Diagonal(@SVector ones(n))
     Qf = 10.0*Diagonal(@SVector ones(n))
     R = 1.0*Diagonal(@SVector ones(m))
-    # TODO set flag for tracking vs not obj = TO.TrackingObjective(Q, R, Z, Qf=Qf)
     obj = LQRObjective(Q,R,Qf,xf,N);
 
     # Create Empty ConstraintList
@@ -44,13 +46,14 @@ function GraspProblem(o::SquareObject, N = 51, tf = 5.0)
         max_f = LinearConstraint(n, m, A, o.f*ones(2), Inequality(), u_ind)
         TO.add_constraint!(conSet, max_f, i:i)
 
-        # SOCP friction cone
+        # SOCP Friction Cone 1
         v1_i = o.v[1][i]
         A1 = (I - v1_i*v1_i')
         c1 = o.mu*v1_i
         nc1 = FrictionConstraint(n, m, A1, c1, TO.SecondOrderCone(), F1_ind)
         TO.add_constraint!(conSet, nc1, i:i)
 
+        # SOCP Friction Cone 2
         v2_i = o.v[2][i]
         A2 = (I - v2_i*v2_i')
         c2 = o.mu*v2_i
@@ -61,6 +64,7 @@ function GraspProblem(o::SquareObject, N = 51, tf = 5.0)
     # Problem
     prob = TO.Problem(o, obj, xf, tf, x0=SVector{n}(x0), constraints=conSet);
 
+    # Intialize Trajectory
     u0 = @SVector [0, -1.5, o.mass*9.81/2, 0, 1.5, o.mass*9.81/2]
     U0 = [u0 for k = 1:N-1]
     initial_controls!(prob, U0)
