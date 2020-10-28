@@ -1,4 +1,7 @@
-import Pkg; Pkg.activate(@__DIR__); Pkg.instantiate()
+import Pkg; Pkg.activate(joinpath(@__DIR__,".."));
+Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/Lyceum/LyceumRegistry.git"))
+Pkg.instantiate()
+cd(@__DIR__)
 import YAML
 
 tf = 2.0
@@ -8,7 +11,9 @@ include("mujoco_test.jl")
 # ALTRO w/ SOCP Benchmark:
 altro_socp_controller = MPCControl.ControllerParams(solver = "Altro", linearized_friction = false)
 mpc_dt = altro_socp_controller.mpc_update
-(altro_times_socp, x_altro_socp, t_altro_socp) = mujoco_controller_test(altro_socp_controller, tf, mpc_dt)
+(altro_times_socp, x_altro_socp, t_altro_socp) = mujoco_controller_test(
+    altro_socp_controller, tf, mpc_dt
+)
 altro_times_socp = altro_times_socp[altro_times_socp .!= 0.0] 
 altro_times_socp .*= 1e-6 # put time into ms
 println("Mean ALTRO SOCP solve time: ", mean(altro_times_socp), " ms.")
