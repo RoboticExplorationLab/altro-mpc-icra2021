@@ -74,7 +74,7 @@ function make_problem_CONVEX_COLD(r::Rocket, obj_opts::ObjectiveOptions,
 
     # Now we are done with the constraints
     # Lastly, we set the initial controls to a hover
-    set_value!(U, hcat([r1.grav for k = 1:t1.N - 1]...))
+    set_value!(U, hcat([r.mass * r.grav for k = 1:t1.N - 1]...))
 
     return prob
 end

@@ -6,10 +6,13 @@ Pkg.instantiate()
 
 using LinearAlgebra, SparseArrays, StaticArrays
 using RobotDynamics, TrajectoryOptimization, Altro
+using Convex, ECOS
 
 include("make_problem.jl")
 include("..\\plotting\\plot_ALTRO.jl")
 include("mpc_altro.jl")
+include("convert_Altro_to_Convex.jl")
+
 
 
 x0_new = @SVector [4.0, 2.0, 20.0, -3.0, 2.0, -5.0]
@@ -46,6 +49,13 @@ opts = SolverOptions(
 altro = ALTROSolver(prob_Altro, opts)
 set_options!(altro, show_summary=true)
 Altro.solve!(altro)
+
+prob_Altro_2 = make_problem_ALTRO_COLD(r1, obj1, t1, out1)
+prob_ECOS_2 = gen_ECOS(prob_Altro_2, opts, verbose = true)
+
+
+
+
 
 # plotALTRO_traj(altro, t1)
 # plotALTRO_controls(altro, r1)
@@ -84,7 +94,8 @@ Altro.solve!(altro)
 #         disturbance = [0.0; 0.0; 0.0; 0.01; 0.02; 0.003]
 #
 #         out2 = OutputOptions(true, true, false, true, true)
-#         X_MPC, U_MPC = loop_MPC_controller!(r1, prob, opts, obj1, t2, out2,
+#         obj2 = ObjectiveOptions(10.0, 100.0, 1e-1)
+#         X_MPC, U_MPC = loop_MPC_controller!(r1, prob, opts, obj2, t2, out2,
 #                                                 disturbance = disturbance)
 #         plotALTRO_trajMPCLOOP(X_MPC, t2)
 # end

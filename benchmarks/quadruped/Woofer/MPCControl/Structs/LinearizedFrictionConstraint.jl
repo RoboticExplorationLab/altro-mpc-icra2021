@@ -1,17 +1,17 @@
-struct FrictionConstraint{T, S} <: TO.ControlConstraint
+struct LinearizedFrictionConstraint{T, S} <: TO.ControlConstraint
 	m::S
 	μ::T
 	i::S
-	function FrictionConstraint(m::S, μ::T, i::S) where {T <: Number, S <: Real}
+	function LinearizedFrictionConstraint(m::S, μ::T, i::S) where {T <: Number, S <: Real}
 		new{T, S}(m, μ, i)
 	end
 end
 
-@inline TrajectoryOptimization.control_dim(con::FrictionConstraint) = con.m
-@inline TrajectoryOptimization.sense(::FrictionConstraint) = Inequality()
-Base.length(::FrictionConstraint) = 4
+@inline TrajectoryOptimization.control_dim(con::LinearizedFrictionConstraint) = con.m
+@inline TrajectoryOptimization.sense(::LinearizedFrictionConstraint) = Inequality()
+Base.length(::LinearizedFrictionConstraint) = 4
 
-function TrajectoryOptimization.evaluate(con::FrictionConstraint, u::SVector)
+function TrajectoryOptimization.evaluate(con::LinearizedFrictionConstraint, u::SVector)
 	x_ind = 3*(con.i-1)+1
 	y_ind = 3*(con.i-1)+2
 	z_ind = 3*(con.i-1)+3

@@ -1,3 +1,8 @@
+using Altro
+using TrajectoryOptimization
+
+const TO = TrajectoryOptimization
+
 """
 Create a Trajectory Optimization problem that tracks the trajectory in `prob`,
 using the same constraints, minus the goal constraint. Tracks the first `N`
@@ -29,7 +34,6 @@ function gen_tracking_problem(prob::TO.Problem, N;
         if !(con isa GoalConstraint)
             if inds.stop > N
                 inds = inds.start:N-(prob.N - inds.stop)
-                inds = inds.start:N
             end
             length(inds) > 0 && TO.add_constraint!(cons, con, inds)
         end

@@ -1,61 +1,61 @@
 \begin{tikzpicture}
 \begin{axis}[ymajorgrids, xmajorgrids, xlabel={knot points (N)}, ymode={linear}, ylabel={computation time (ms)}, xtick={11,31,51,71,101}, legend style={at={(0.1,0.9)}, anchor={north west}}]
-    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={7}, lower whisker={0.149108}, lower quartile={0.16579075}, median={0.22830499999999998}, upper quartile={0.38742775}, upper whisker={0.6745709999999999}, box extend={6}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={7}, lower whisker={0.1605922}, lower quartile={0.16254995}, median={0.1687001}, upper quartile={0.22900145}, upper whisker={0.24261139999999998}, box extend={6}}, mark options={scale={0.5}}]
         coordinates {
         }
         ;
-    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={27}, lower whisker={0.411498}, lower quartile={0.4389575}, median={0.6161049999999999}, upper quartile={1.0600509999999999}, upper whisker={1.8417899999999998}, box extend={6}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={27}, lower whisker={0.4703994}, lower quartile={0.4813072}, median={0.5225191}, upper quartile={0.67719875}, upper whisker={0.7356535999999999}, box extend={6}}, mark options={scale={0.5}}]
         coordinates {
         }
         ;
-    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={47}, lower whisker={0.6816869999999999}, lower quartile={0.73967775}, median={1.0417035}, upper quartile={1.81014275}, upper whisker={3.163731}, box extend={6}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={47}, lower whisker={0.7926674}, lower quartile={0.807806}, median={0.8677374999999999}, upper quartile={1.1406692500000002}, upper whisker={1.6381596}, box extend={6}}, mark options={scale={0.5}}]
         coordinates {
         }
         ;
-    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={67}, lower whisker={0.971445}, lower quartile={1.1615699999999998}, median={1.5136015}, upper quartile={2.78534075}, upper whisker={4.555534}, box extend={6}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={67}, lower whisker={1.1121956}, lower quartile={1.14501205}, median={1.2085632999999998}, upper quartile={1.6087438}, upper whisker={2.3199224}, box extend={6}}, mark options={scale={0.5}}]
         coordinates {
         }
         ;
-    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={97}, lower whisker={1.408032}, lower quartile={1.965237}, median={2.251258}, upper quartile={3.9786244999999996}, upper whisker={6.819725}, box extend={6}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={97}, lower whisker={1.613357}, lower quartile={1.6974522999999997}, median={1.9376035999999999}, upper quartile={2.3849698999999998}, upper whisker={2.8239152}, box extend={6}}, mark options={scale={0.5}}]
         coordinates {
         }
         ;
-    \addplot+[color={rgb,1:red,0.0;green,0.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={15}, lower whisker={0.546697}, lower quartile={0.5855835}, median={0.5977870000000001}, upper quartile={0.6069882499999999}, upper whisker={0.898231}, box extend={6}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,0.0;green,0.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={15}, lower whisker={0.60147}, lower quartile={0.6163810000000001}, median={0.620181}, upper quartile={0.6241525}, upper whisker={0.6833250000000001}, box extend={6}}, mark options={scale={0.5}}]
         coordinates {
         }
         ;
-    \addplot+[color={rgb,1:red,0.0;green,0.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={35}, lower whisker={1.7017740000000001}, lower quartile={1.74440625}, median={1.762168}, upper quartile={1.78930275}, upper whisker={2.1119149999999998}, box extend={6}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,0.0;green,0.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={35}, lower whisker={1.74151}, lower quartile={1.784153}, median={1.8087145000000002}, upper quartile={1.83166525}, upper whisker={1.9961010000000001}, box extend={6}}, mark options={scale={0.5}}]
         coordinates {
         }
         ;
-    \addplot+[color={rgb,1:red,0.0;green,0.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={55}, lower whisker={2.82182}, lower quartile={2.87373775}, median={2.8977019999999998}, upper quartile={2.92580425}, upper whisker={3.93152}, box extend={6}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,0.0;green,0.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={55}, lower whisker={2.8749040000000003}, lower quartile={2.92228875}, median={2.944963}, upper quartile={2.9924524999999997}, upper whisker={3.3615670000000004}, box extend={6}}, mark options={scale={0.5}}]
         coordinates {
         }
         ;
-    \addplot+[color={rgb,1:red,0.0;green,0.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={75}, lower whisker={3.923367}, lower quartile={3.9816347499999996}, median={4.004249}, upper quartile={4.03737525}, upper whisker={4.747419}, box extend={6}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,0.0;green,0.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={75}, lower whisker={4.039005}, lower quartile={4.087773}, median={4.134266}, upper quartile={4.259359}, upper whisker={5.690253}, box extend={6}}, mark options={scale={0.5}}]
         coordinates {
         }
         ;
-    \addplot+[color={rgb,1:red,0.0;green,0.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={105}, lower whisker={5.683712}, lower quartile={5.7591425}, median={5.801072}, upper quartile={5.9971327500000005}, upper whisker={8.710295}, box extend={6}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,0.0;green,0.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={105}, lower whisker={5.755394}, lower quartile={5.8884697500000005}, median={5.9872805}, upper quartile={6.279696749999999}, upper whisker={7.612586}, box extend={6}}, mark options={scale={0.5}}]
         coordinates {
         }
         ;
     \addplot+[red, dashed, no marks, very thick]
         coordinates {
-            (7,0.2821365122222222)
-            (27,0.7611697322222222)
-            (47,1.3034807222222224)
-            (67,1.9584416788888885)
-            (97,2.912922357777777)
+            (7,0.19309163399999998)
+            (27,0.582848802)
+            (47,0.9838596)
+            (67,1.4055482819999998)
+            (97,2.13248893)
         }
         ;
     \addplot+[blue, dashed, no marks, very thick]
         coordinates {
-            (15,0.6272674488888889)
-            (35,1.8244449255555557)
-            (55,3.0150839355555554)
-            (75,4.153074696666667)
-            (105,6.113447385555555)
+            (15,0.6261655400000001)
+            (35,1.8298356400000002)
+            (55,2.99352737)
+            (75,4.34015614)
+            (105,6.20809354)
         }
         ;
     \legend{{ALTRO},{OSQP}}

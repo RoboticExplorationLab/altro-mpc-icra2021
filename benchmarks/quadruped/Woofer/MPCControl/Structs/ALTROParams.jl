@@ -1,4 +1,12 @@
-struct OptimizerParams{T, S, L, P, A}
+# Altro solver deps:
+using TrajectoryOptimization
+using RobotDynamics
+using Altro
+
+const TO = TrajectoryOptimization
+const RD = RobotDynamics
+
+struct AltroParams{T, S, L, P, A}
 	# discretization length
 	dt::T
 
@@ -19,8 +27,9 @@ struct OptimizerParams{T, S, L, P, A}
 	u_ref::Vector{SVector{12,T}}
 	J::SMatrix{3,3,T,9}
 	sprung_mass::T
+end
 
-	function OptimizerParams(
+function AltroParams(
 							    dt::T,
 							    N::S,
 							    q::AbstractVector{T},
@@ -30,7 +39,8 @@ struct OptimizerParams{T, S, L, P, A}
 							    min_vert_force::T,
 							    max_vert_force::T;
 							    n::Integer = 12,
-							    m::Integer = 12,
+								m::Integer = 12,
+								linearized_friction = true
 							) where {T<:Number, S<:Integer}
 		Q = Diagonal(SVector{n}(q))
 		R = Diagonal(SVector{m}(r))
@@ -52,30 +62,35 @@ struct OptimizerParams{T, S, L, P, A}
 		constraints = ConstraintList(n,m,N)
 
 		for i=1:4
-			add_constraint!(constraints, FrictionConstraint(m, μ, i) , 1:N-1)
-		end
+			if linearized_friction 
+				TO.add_constraint!(constraints, LinearizedFrictionConstraint(m, μ, i) , 1:N-1)
+			else
+				TO.add_constraint!(constraints, FrictionConstraint(m, μ, i) , 1:N-1)
+			end
+		end 
 
 		u_min = @SVector [-Inf, -Inf, min_vert_force, -Inf, -Inf, min_vert_force, -Inf, -Inf, min_vert_force, -Inf, -Inf, min_vert_force]
 		u_max = @SVector [Inf, Inf, max_vert_force, Inf, Inf, max_vert_force, Inf, Inf, max_vert_force, Inf, Inf, max_vert_force]
 		bound = BoundConstraint(n,m, u_min=u_min, u_max=u_max)
-		add_constraint!(constraints, bound, 1:N)
+		TO.add_constraint!(constraints, bound, 1:N)
 
 		# objective
+		Z = Traj(n, m, dt, N)
+		# objective = TO.TrackingObjective(Q, R, Z)
 		objective = LQRObjective(Q, R, Q, x_des, N)
 
 		tf = dt*(N-1)
-		problem = Problem(model, objective, x_des, tf, x0=zeros(n), constraints=constraints, integration=RD.PassThrough)
+		problem = TO.Problem(model, objective, x_des, tf, x0=zeros(n), constraints=constraints, integration=RD.PassThrough)
 		solver = ALTROSolver(problem)
 		set_options!(solver, projected_newton=false, dJ_counter_limit=20)
 		set_options!(solver, reset_duals=false, penalty_scaling=10., penalty_initial=10.0)
 		set_options!(solver, constraint_tolerance=1e-4, cost_tolerance=1e-4)
 
-		solve!(solver)
+		Altro.solve!(solver)
 
 		P = typeof(problem)
 		A = typeof(solver)
 		L = typeof(model)
 
-		new{T,S,L,P,A}(dt, n, m, model, objective, constraints, problem, solver, X0, U0, u_ref, woofer.inertial.body_inertia, woofer.inertial.sprung_mass)
+		AltroParams{T,S,L,P,A}(dt, n, m, model, objective, constraints, problem, solver, X0, U0, u_ref, woofer.inertial.body_inertia, woofer.inertial.sprung_mass)
 	end
-end

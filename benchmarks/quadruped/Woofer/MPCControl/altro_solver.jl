@@ -3,73 +3,6 @@ This file turns the discrete MPC problem into a quadratic problem via a sparse
 formulation.
 """
 
-function NonLinearContinuousDynamics(
-    x::SVector,
-    u::SVector,
-    r::FootstepLocation,
-    contacts::SVector,
-    J::SMatrix,
-    sprung_mass::AbstractFloat,
-)
-    rot = MRP(x[4], x[5], x[6])
-
-    p = x[SUnitRange(1,3)]
-    v = x[SUnitRange(7,9)]
-    ω = x[SUnitRange(10,12)]
-
-    x_d_1_3 = v
-    x_d_4_6 = Rotations.kinematics(rot, ω)
-
-    torque_sum = @SVector zeros(3)
-    force_sum = @SVector [0, 0, -9.81]
-    for i = 1:4
-        force_sum += 1 / sprung_mass * contacts[i] * u[SLegIndexToRange(i)]
-
-        # foot position in body frame:
-        r_b = rot' * (r[i] - p)
-
-        torque_sum +=
-            contacts[i] *
-            Rotations.skew(r_b) *
-            rot' *
-            u[SLegIndexToRange(i)]
-    end
-    x_d_7_9 = force_sum
-    x_d_10_12 = inv(J) * (-Rotations.skew(ω) * J * ω + torque_sum)
-
-    return [x_d_1_3; x_d_4_6; x_d_7_9; x_d_10_12]
-end
-
-function LinearizedContinuousDynamicsA(
-    x::SVector{n,T},
-    u::SVector{m,T},
-    r,
-    contacts,
-    J,
-    sprung_mass,
-)::SMatrix{n,n,T,n * n} where {T,n,m}
-    return ForwardDiff.jacobian(
-        (x_var) ->
-            NonLinearContinuousDynamics(x_var, u, r, contacts, J, sprung_mass),
-        x,
-    )
-end
-
-function LinearizedContinuousDynamicsB(
-    x::SVector{n,T},
-    u::SVector{m,T},
-    r,
-    contacts,
-    J,
-    sprung_mass,
-)::SMatrix{n,m,T,n * m} where {T,n,m}
-    return ForwardDiff.jacobian(
-        (u_var) ->
-            NonLinearContinuousDynamics(x, u_var, r, contacts, J, sprung_mass),
-        u,
-    )
-end
-
 function reference_trajectory!(
     x_curr::AbstractVector{T},
     param::ControllerParams,
@@ -132,13 +65,17 @@ function update_dynamics_matrices!(param::ControllerParams)
         opt.model.B[i] = B_c_i * opt.dt + A_c_i*B_c_i*opt.dt^2/2
         opt.model.d[i] = d_c_i * opt.dt + A_c_i*d_c_i*opt.dt^2/2
     end
+
+    # Z = Traj(param.x_ref, opt.u_ref, opt.dt)
+
+    # update_trajectory!(opt.objective, Z)
 end
 
 function foot_forces!(
     x_curr::AbstractVector{T},
     t::T,
-    param::ControllerParams,
-) where {T<:Number}
+    param::ControllerParams{O},
+) where {T<:Number, O<:AltroParams}
     # x_ref: 12xN+1 matrix of state reference trajectory (where first column is x0)
     # contacts: 4xN+1 matrix of foot contacts over the planning horizon
     # foot_locs: 12xN+1 matrix of foot location in body frame over planning horizon
@@ -154,7 +91,7 @@ function foot_forces!(
 
     initial_states!(opt.problem, opt.X0)
     initial_controls!(opt.problem, opt.U0)
-    b = @benchmark solve!($(opt.solver)) samples=1 evals=1
+    b = @benchmark Altro.solve!($(opt.solver)) samples=1 evals=1
 
     opt.X0 .= states(opt.solver)
     opt.U0 .= controls(opt.solver)

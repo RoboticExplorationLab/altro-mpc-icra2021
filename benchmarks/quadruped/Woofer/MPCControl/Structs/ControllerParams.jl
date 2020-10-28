@@ -1,4 +1,4 @@
-mutable struct ControllerParams{T,S,O}
+mutable struct ControllerParams{O,T,S}
     # initialize everything once
     mpc_torques
     swing_torques
@@ -37,7 +37,7 @@ mutable struct ControllerParams{T,S,O}
     swing::SwingLegParams{T}
 end
 
-function ControllerParams(T, S)
+function ControllerParams(; solver="", linearized_friction="", T=Float64, S=Int64)
     # TODO: make sure zeros outputs type T
     data = YAML.load(open(joinpath(@__DIR__, "../MPC.yaml")))
     N = data["N"]
@@ -103,8 +103,11 @@ function ControllerParams(T, S)
     min_vert_force = data["min_vert_force"]
     max_vert_force = data["max_vert_force"]
 
-    if using_altro
-        optimizer = OptimizerParams(
+    solver_ = solver == "" ? data["solver"] : solver
+
+    if solver_ == "Altro"
+        linearized_friction_ = linearized_friction == "" ? data["linearized_friction"] : linearized_friction
+        optimizer = AltroParams(
             data["dynamics_discretization"],
             N,
             data["q"],
@@ -113,9 +116,20 @@ function ControllerParams(T, S)
             μ,
             min_vert_force,
             max_vert_force,
+            linearized_friction=linearized_friction_
         )
-    else
-        optimizer = OptimizerParams(
+    elseif solver_ == "OSQP"
+        optimizer = OSQPParams(
+            data["dynamics_discretization"],
+            N,
+            data["q"],
+            data["r"],
+            μ,
+            min_vert_force,
+            max_vert_force,
+        )
+    elseif solver_ == "ECOS"
+        optimizer = ECOSParams(
             data["dynamics_discretization"],
             N,
             data["q"],
@@ -160,7 +174,7 @@ function ControllerParams(T, S)
 
     O = typeof(optimizer)
 
-    ControllerParams{T,S,O}(
+    ControllerParams{O,T,S}(
         mpc_torques,
         swing_torques,
         prev_phase,

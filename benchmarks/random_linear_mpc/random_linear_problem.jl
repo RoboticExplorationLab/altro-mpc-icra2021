@@ -1,3 +1,4 @@
+include(joinpath(@__DIR__,"..","mpc.jl"))
 """
 Generate the random linear problem with `n` states, `m` controls, and `N` knot points
 """
@@ -11,7 +12,7 @@ function gen_random_linear(n,m,N, dt=0.1)
     R = Diagonal(0.1*ones(m))
     Qf = Q * (N-1)
 
-    u_bnd = 2  # 2 sigma
+    u_bnd = 3  # 2 sigma
 
     x0 = @SVector zeros(n)
     xf = copy(x0) 
@@ -75,44 +76,6 @@ function gen_OSQP(prob0::Problem, opts::SolverOptions)
     return model, l,u
 end
 
-"""
-Create a Trajectory Optimization problem that tracks the trajectory in `prob`,
-using the same constraints, minus the goal constraint. Tracks the first `N`
-time steps.
-"""
-function gen_tracking_problem(prob::Problem, N)
-    n,m = size(prob)
-    dt = prob.Z[1].dt
-    tf = (N-1)*dt
-
-    # Get sub-trajectory
-    Z = Traj(prob.Z[1:N])
-    x0 = state(Z[1])
-    xf = state(Z[N])  # this actually doesn't effect anything
-
-    # Generate a cost that tracks the trajectory
-    Q = Diagonal(@SVector fill(10.0, n))
-    R = Diagonal(@SVector fill(0.1, m))
-    obj = TO.TrackingObjective(Q, R, Z) 
-
-    # Use the same constraints, except the Goal constraint
-    cons = ConstraintList(n,m,N)
-    for (inds, con) in zip(prob.constraints)
-        if !(con isa GoalConstraint)
-            if inds.stop > N
-                inds = inds.start:N
-            end
-            add_constraint!(cons, con, inds)
-        end
-    end
-
-    prob = Problem(prob.model, obj, xf, tf, x0=x0, constraints=cons, 
-        integration=TO.integration(prob)
-    )
-    initial_trajectory!(prob, Z)
-    return prob
-end
-
 
 """
 Run the MPC problem to track `Z_track`
@@ -162,7 +125,7 @@ function run_MPC(prob_mpc, opts_mpc, Z_track, num_iters=length(Z_track) - prob_m
         TO.set_initial_time!(prob_mpc, t0)
 
         # Update initial state by using 1st control, and adding some noise 
-        x0 = discrete_dynamics(TO.integration(prob), prob_mpc.model, prob_mpc.Z[1])
+        x0 = discrete_dynamics(TO.integration(prob_mpc), prob_mpc.model, prob_mpc.Z[1])
         x0 += (@SVector randn(n)) * norm(x0,Inf) / 100  # 1% noise
         TO.set_initial_state!(prob_mpc, x0)
 
@@ -194,12 +157,20 @@ function run_MPC(prob_mpc, opts_mpc, Z_track, num_iters=length(Z_track) - prob_m
         OSQP.warm_start!(osqp, x=x, y=y)
 
         # Solve the updated problem
-        solve!(altro)
+        # GC.enable(false)
+        b = benchmark_solve!(altro, samples=5, evals=5)
         OSQP.solve!(osqp, res)
+        # GC.enable(true)
+        # GC.gc()
 
+        if Altro.status(altro) != Altro.SOLVE_SUCCEEDED
+            println(Altro.status(altro))
+            @warn ("Solve not succeeded at iteration $i")
+            return altro
+        end
         iters[i,1] = iterations(altro)
         iters[i,2] = res.info.iter
-        times[i,1] = altro.stats.tsolve
+        times[i,1] = median(b).time * 1e-6 
         times[i,2] = res.info.solve_time * 1000 
 
         # Compare the solutions
