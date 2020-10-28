@@ -19,6 +19,9 @@ struct OSQPParams{T,S,M}
     B_vec::Vector{SMatrix{12,12,T,144}}
     d_vec::Vector{SVector{12,T}}
 
+    X0::Vector{SVector{12,T}}
+    U0::Vector{SVector{12,T}}
+
     u_ref::Vector{SVector{12, T}}
     J::SMatrix{3,3,T,9}
     sprung_mass::T
@@ -122,7 +125,7 @@ function OSQPParams(
     P_osqp = sparse(P_osqp)
 
     OSQP.setup!(model, P=P_osqp, q=q_osqp, A=A_osqp, l=l, u=u, verbose=false)
-    OSQP.update_settings!(model, eps_abs = tol, eps_rel = tol, eps_prim_inf = tol, eps_dual_inf = tol)
+    OSQP.update_settings!(model, eps_abs = tol, eps_rel = tol, eps_prim_inf = tol, eps_dual_inf = tol, warm_start=true)
 
     J = woofer.inertial.body_inertia
     sprung_mass = woofer.inertial.sprung_mass
@@ -133,6 +136,9 @@ function OSQPParams(
     A_vec = [@SMatrix zeros(n,n) for i=1:(N-1)]
     B_vec = [@SMatrix zeros(n,m) for i=1:(N-1)]
     d_vec = [@SVector zeros(n) for i=1:(N-1)]
+
+    X0 = [@SVector zeros(n) for i=1:(N)]
+    U0 = [@SVector zeros(n) for i=1:(N-1)]
 
     return OSQPParams{T,S,M}(
         dt,
@@ -147,6 +153,8 @@ function OSQPParams(
         A_vec,
         B_vec,
         d_vec,
+        X0, 
+        U0,
         u_ref,
         J,
         sprung_mass

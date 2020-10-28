@@ -16,6 +16,11 @@ struct ECOSParams{T,S}
     B_vec::Vector{SMatrix{12,12,T,144}}
     d_vec::Vector{SVector{12,T}}
 
+    X0::Vector{SVector{12,T}}
+    U0::Vector{SVector{12,T}}
+
+    tol::T
+
     u_ref::Vector{SVector{12, T}}
     J::SMatrix{3,3,T,9}
     sprung_mass::T
@@ -38,7 +43,10 @@ function ECOSParams(
     B_vec = [@SMatrix zeros(n,m) for i=1:(N-1)]
     d_vec = [@SVector zeros(n) for i=1:(N-1)]
 
-    u_ref = [@SVector zeros(n) for i=1:(N-1)]
+    X0 = [@SVector zeros(n) for i=1:N]
+    U0 = [@SVector zeros(m) for i=1:N-1]
+
+    u_ref = [@SVector zeros(m) for i=1:(N-1)]
 
     return ECOSParams{T,S}(
         dt,
@@ -50,6 +58,9 @@ function ECOSParams(
         A_vec,
         B_vec,
         d_vec,
+        X0, 
+        U0,
+        tol,
         u_ref,
         J,
         sprung_mass
