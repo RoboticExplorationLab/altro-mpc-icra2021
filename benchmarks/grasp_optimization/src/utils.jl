@@ -20,6 +20,8 @@ function generate_pvB_3D(p0, v0, θ)
 end
 
 function compute_rot_traj_coeffs(t0,tf,c)
+    # finds a cubic function satisying initial and terminal constraints
+    # for position and velocity
     A = [t0^3 t0^2 t0 1;
          tf^3 tf^2 tf 1;
          3t0^2 2t0 1 0;

@@ -1,35 +1,58 @@
-using Pkg
-Pkg.activate(@__DIR__)
-Pkg.instantiate()
+import Pkg; Pkg.activate(joinpath(@__DIR__,"..")); Pkg.instantiate()
 
-# Run MPC
-noise = [.03*randn(6) for i=1:20] # use the same dynamics noise for both runs
-include("altro_MPC.jl") # generates altro_times, altro_states, altro_controls
-include("ecos_MPC.jl") # generates ecos_times, ecos_states, ecos_controls
+using BenchmarkTools
+using JuMP, ECOS
+using TrajectoryOptimization, Altro
+const TO = TrajectoryOptimization
+using RobotDynamics
+const RD = RobotDynamics
+using JLD2
+using Random
+using Plots
 
-# Verify Matching Trajectories
-for i=1:num_iters
-    print("Timestep $i: ")
-    print("\tState diff = ", round(norm(altro_states[i+1] - ecos_states[i+1]), digits=2))
-    println("\tControl diff = ", round(norm(altro_controls[i] - ecos_controls[i]), digits=2))
+include("grasp_mpc.jl") # Run cold solve and set up MPC tracking problem
+include("../plotting.jl") # Function for comparison box plots
+
+## Run Benchmark
+println("Starting MPC Benchmark...")
+Random.seed!(1)
+opts_cold = SolverOptions(
+    verbose = 0,
+    projected_newton=false,
+    cost_tolerance=1e-6,
+    cost_tolerance_intermediate=1e-4,
+    constraint_tolerance=1e-6
+)
+opts_mpc = SolverOptions(
+    cost_tolerance=1e-4,
+    cost_tolerance_intermediate=1e-3,
+    constraint_tolerance=1e-4,
+    projected_newton=false,
+    penalty_initial=10_000.,
+    penalty_scaling=100.,
+    # reset_duals = false,
+)
+Ns = [11, 21, 31, 41, 51]
+results = map(Ns) do N_mpc
+    println("Running with $N_mpc knot points...")
+    # Solve Cold Start
+    o = SquareObject()
+    prob_cold = GraspProblem(o,251)
+    altro = ALTROSolver(prob_cold, opts_cold)
+    solve!(altro)
+    Z_track = get_trajectory(altro)
+
+    # Run MPC
+    Q,R,Qf = 1e3,1e0,1e1
+    prob_mpc = gen_tracking_problem(prob_cold, N_mpc, Qk = Q, Rk = R, Qfk = Qf)
+    run_grasp_mpc(prob_mpc, opts_mpc, Z_track, print_all=false)
 end
 
-# Solve Time Difference
-ave_diff = (sum(ecos_times) - sum(altro_times))/length(altro_times)
-println("\n Average ALTRO solve time was $(round(ave_diff, digits=2)) ms faster than that of ECOS")
-
 # Save Results
-using JLD2
-@save string(@__DIR__,"/grasp_benchmark_data.jld2") altro_times altro_states altro_controls ecos_times ecos_states ecos_controls
+@save joinpath(@__DIR__, "grasp_benchmark_data.jld2") results Ns
+@load joinpath(@__DIR__, "grasp_benchmark_data.jld2") results Ns
 
-# Plot Timing Results
-using Plots
-bounds = extrema([altro_times; ecos_times])
-bin_min = floor(Int, bounds[1]) - 1
-bin_max = ceil(Int, bounds[2]) + 1
-bins = collect(bin_min:2:bin_max)
-histogram(altro_times, bins=bins, fillalpha=.5, label="ALTRO")
-histogram!(ecos_times, bins=bins, fillalpha=.5, label="ECOS")
-xlabel!("Solve Time (ms)")
-ylabel!("Counts")
-png(string(@__DIR__,"/grasp_hist.png"))
+# Generate Plots
+timing_results = [results[i][1] for i=1:length(Ns)]
+p = comparison_plot(timing_results, Ns, "knot points (N)", shift=0, width=4)
+pgfsave(joinpath(IMAGE_DIR,"grasp_horizon_comp.tikz"), p, include_preamble=false)

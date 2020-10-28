@@ -1,6 +1,70 @@
 import RobotDynamics: state_dim, control_dim
 import TrajectoryOptimization: StageConstraint, ConstraintSense, SecondOrderCone
 
+struct AffineSOCTraj{S,P,W,T} <: StageConstraint
+	n::Int
+	m::Int
+	A::Vector{SizedMatrix{P,W,T,2}}
+	c::Vector{SizedVector{P,T,1}}
+	sense::S
+	inds::SVector{W,Int}
+	function AffineSOCTraj(n::Int, m::Int, 
+			A::Vector{<:AbstractMatrix}, 
+			c::Vector{<:AbstractVector}, 
+			sense::ConstraintSense,
+			inds=SVector{n+m}(1:n+m)
+		)
+		P,W = size(A[1])
+		if inds == :state
+			inds = SVector{n}(1:n)
+		elseif inds == :control
+			inds = SVector{m}(n .+ (1:m))
+		end
+		T = promote_type(eltype(eltype(A)), eltype(eltype(c)))
+		A = [SizedMatrix{P,W,T}(Ai) for Ai in A]
+		c = [SizedVector{P,T}(ci) for ci in c]
+		@assert length(A) == length(c)
+		new{typeof(sense),P,W,T}(n,m,A,c,sense,inds)
+	end
+end
+
+@inline state_dim(con::AffineSOCTraj) = con.n
+@inline control_dim(con::AffineSOCTraj) = con.m
+@inline TO.sense(con::AffineSOCTraj) = con.sense
+@inline Base.length(::AffineSOCTraj{TO.SecondOrderCone,D}) where D = D + 1
+
+function TO.evaluate!(
+    vals::Vector{<:AbstractVector},
+    con::AffineSOCTraj,
+    Z::RD.AbstractTrajectory,
+    inds = 1:length(Z),
+)
+	for (i,k) in enumerate(inds)
+		z = Z[k].z[con.inds]
+		v = con.A[i] * z 
+		t = con.c[i]'z
+		vals[i] .= push(v,t)
+	end
+end
+
+function TO.jacobian!(
+    ∇c::VecOrMat{<:AbstractMatrix},
+    con::AffineSOCTraj{<:Any,D},
+    Z::RD.AbstractTrajectory,
+    inds = 1:length(Z),
+    is_const = BitArray(undef, size(∇c))
+) where D
+	for (i,k) in enumerate(inds)
+		∇c[i][1:D, con.inds] = con.A[i]
+		∇c[i][1+D, con.inds] = con.c[i]
+		is_const[i] = true
+	end
+end
+
+function Base.copy(c::AffineSOCTraj)
+	AffineSOCTraj(c.n, c.m, deepcopy(c.A), deepcopy(c.c), c.sense, c.inds)
+end
+
 """
 norm(Ay) <= c'y
 (Ay, c'y) lies in soc
@@ -55,11 +119,66 @@ function TO.change_dimension(con::NormConstraint2, n::Int, m::Int, ix=1:n, iu=1:
 	NormConstraint2(n, m, con.val, con.sense, ix[con.inds])
 end
 
+"""
+Linear Constraint with a different A,b at each time step
+"""
+struct LinearConstraintTraj{S,P,W,T} <: StageConstraint
+	n::Int
+	m::Int
+	A::Vector{SizedMatrix{P,W,T,2}}
+	b::Vector{SizedVector{P,T,1}}
+	sense::S
+	inds::SVector{W,Int}
+	function LinearConstraintTraj(n::Int, m::Int, 
+			A::Vector{<:AbstractMatrix}, 
+			b::Vector{<:AbstractVector},
+			sense::ConstraintSense, 
+			inds=1:n+m
+		)
+		P,W = size(A[1])
+		@assert length(A) == length(b) "A and b must be the same length"
+		@assert length(inds) == W
+		T = promote_type(eltype(eltype(A)), eltype(eltype(b)))
+		A = [SizedMatrix{P,W,T}(Ai) for Ai in A]
+		b = [SizedVector{P,T}(bi) for bi in b]
+		inds = SVector{W}(inds)
+		new{typeof(sense),P,W,T}(n,m,A,b,sense,inds)
+	end
+end
+
+@inline TO.sense(con::LinearConstraintTraj) = con.sense
+@inline Base.length(con::LinearConstraintTraj{<:Any,P}) where P = P
+@inline TO.state_dim(con::LinearConstraintTraj) = con.n
+@inline TO.control_dim(con::LinearConstraintTraj) = con.m
+
+function TO.evaluate!(vals::Vector{<:AbstractVector}, con::LinearConstraintTraj, 
+		Z::RD.AbstractTrajectory, inds=1:length(Z)
+	)
+	for (i,k) in enumerate(inds)
+		vals[i] .= con.A[i] * Z[k].z[con.inds]  - con.b[i]
+	end
+end
+
+function TO.jacobian!(
+		∇c::VecOrMat{<:AbstractMatrix},
+		con::LinearConstraintTraj,
+		Z::RD.AbstractTrajectory,
+		inds = 1:length(Z),
+		is_const = BitArray(undef, size(∇c))
+	)
+	for (i,k) in enumerate(inds)
+		∇c[i][:,con.inds] .= con.A[i] 
+		is_const[i] = true 
+	end
+end
+
+function Base.copy(c::LinearConstraintTraj)
+	LinearConstraintTraj(c.n, c.m, deepcopy(c.A), deepcopy(c.b), c.sense, c.inds)
+end
 
 """
-mutable linear constraint
+LinearConstraint with mutable b vector
 """
-
 struct LinearConstraint2{S,P,W,T} <: StageConstraint
 	n::Int
 	m::Int
@@ -102,3 +221,5 @@ function TO.change_dimension(con::LinearConstraint2, n::Int, m::Int, ix=1:n, iu=
 	inds = inds0[con.inds] # indices of elements in new z
 	LinearConstraint2(n, m, con.A, con.b, con.sense, inds)
 end
+
+
