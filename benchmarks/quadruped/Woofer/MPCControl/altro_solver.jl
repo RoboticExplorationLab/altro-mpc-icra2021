@@ -36,6 +36,9 @@ function update_dynamics_matrices!(param::ControllerParams)
         opt.model.B[i] = B_c_i * opt.dt + A_c_i*B_c_i*opt.dt^2/2
         opt.model.d[i] = d_c_i * opt.dt + A_c_i*d_c_i*opt.dt^2/2
     end
+
+    Z = Traj(param.x_ref, opt.u_ref, opt.model.times)
+    TO.update_trajectory!(opt.objective, Z)
 end
 
 function foot_forces!(
@@ -52,16 +55,24 @@ function foot_forces!(
     n = 12
     m = 12
 
-    # TrajectoryOptimization.reset!(opt.constraints) 
     update_dynamics_matrices!(param)
-    opt.solver.solver_al.solver_uncon.x0 .= x_curr
+
+    # update the current state of the solver
+    TO.set_initial_state!(opt.problem, x_curr)
+
+    # # Shift the initial trajectory
+    # RD.shift_fill!(prob_mpc.Z)
+
+    # # Shift the multipliers and penalties
+    # Altro.shift_fill!(TO.get_constraints(altro))
 
     initial_states!(opt.problem, opt.X0)
     initial_controls!(opt.problem, opt.U0)
-    b = @benchmark Altro.solve!($(opt.solver)) samples=1 evals=1
+    Altro.solve!(opt.solver)
 
     param.new_info = true
-    param.last_solve_time = b.times[1]
+    param.last_solve_time = opt.solver.stats.tsolve
+    param.last_solve_iterations = opt.solver.stats.iterations
 
     opt.X0 .= states(opt.solver)
     opt.U0 .= controls(opt.solver)

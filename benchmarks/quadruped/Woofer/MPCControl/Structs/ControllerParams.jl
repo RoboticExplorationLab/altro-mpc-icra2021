@@ -38,6 +38,7 @@ mutable struct ControllerParams{O,T,S}
 
     # benchmarking information:
     last_solve_time::T
+    last_solve_iterations::S
     new_info::Bool
 end
 
@@ -209,6 +210,7 @@ function ControllerParams(; solver="", linearized_friction="", tol=1e-4, T=Float
         gait,
         swing,
         0.0,
+        -1,
         false
     )
 end

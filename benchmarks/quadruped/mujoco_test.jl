@@ -31,6 +31,7 @@ function mujoco_simulate(controller, tf, mpc_dt)
 
     num_samples = Integer(floor(tf/mpc_dt + 1))
     solve_times = zeros(num_samples)
+    solve_iterations = zeros(Int64, num_samples)
     state_history = [zeros(12) for i=1:num_samples]
     force_history = [zeros(12) for i=1:num_samples]
     time_history = zeros(num_samples)
@@ -50,6 +51,7 @@ function mujoco_simulate(controller, tf, mpc_dt)
                 state_history[j] = x
                 time_history[j] = t
                 force_history[j] = controller.forces
+                solve_iterations[j] = controller.last_solve_iterations
 
                 j += 1 
 
@@ -64,7 +66,7 @@ function mujoco_simulate(controller, tf, mpc_dt)
         mj_step(m, d);
     end
 
-    return solve_times, state_history, force_history, time_history
+    return solve_times, state_history, force_history, time_history, solve_iterations
 end
 
 function get_state(d)
@@ -206,3 +208,11 @@ end
 function get_cost(X, U, Q, R, x̄)
     return sum([(X[i] - x̄)'*Q*(X[i] - x̄) for i=1:length(X)]) + sum([(U[i])'*R*(U[i]) for i=1:length(U)])
 end
+
+## SOLUTION TESTING CODE:
+# altro_socp_controller = MPCControl.ControllerParams(solver = "Altro", linearized_friction = false, tol=1e-8)
+# ecos_controller = MPCControl.ControllerParams(solver = "ECOS", linearized_friction = false, tol=1e-8)
+# test_same_solution(altro_socp_controller, ecos_controller, altro_socp_controller.mpc_update, linearized_friction=false, direct_time = false, test_tol=1e-4)
+# altro_controller = MPCControl.ControllerParams(solver = "Altro", linearized_friction = true, tol=1e-6)
+# osqp_controller = MPCControl.ControllerParams(solver = "OSQP", linearized_friction = true, tol=1e-10)
+# test_same_solution(altro_controller, osqp_controller, osqp_controller.mpc_update, linearized_friction=true, direct_time = false)
