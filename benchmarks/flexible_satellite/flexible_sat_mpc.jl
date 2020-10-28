@@ -8,6 +8,7 @@ using Altro
 using Statistics
 using LinearAlgebra
 # using MATLAB
+using Random
 using OSQP
 using RobotDynamics
 using RobotZoo
@@ -15,6 +16,7 @@ using StaticArrays
 const RD = RobotDynamics
 const TO = TrajectoryOptimization
 
+Random.seed!(1)
 function eye(n::Int)
     return diagm(ones(n))
 end
