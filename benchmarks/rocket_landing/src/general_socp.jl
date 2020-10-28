@@ -16,10 +16,12 @@ struct NormConstraint2{S,D,p,q} <: TrajectoryOptimization.StageConstraint
     inds::SVector{D,Int}
     function NormConstraint2(n::Int, m::Int, A::StaticMatrix, c::StaticVector,
                                 sense::TrajectoryOptimization.ConstraintSense,
-                                inds = SVector{m}(1:m))
-        if inds == :control
-            inds = SVector{m}(n .+ (1:m))
-        end
+                                inds = SVector{n+m}(1:n+m))
+        if inds == :state
+			inds = SVector{n}(1:n)
+		elseif inds == :control
+			inds = SVector{m}(n .+ (1:m))
+		end
         @assert size(A,2) == length(c)
         @assert eltype(A) == eltype(c)
 

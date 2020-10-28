@@ -1,0 +1,23 @@
+\begin{tikzpicture}
+\begin{axis}[ylabel={computation time (ms)}, xlabel={optimality tolerance}, xmode={log}, legend style={at={(0.1,0.5)}, anchor={west}}]
+    \addplot+[very thick]
+        coordinates {
+            (1.0,0.188857)
+            (0.1,0.57972)
+            (0.01,0.865136)
+            (0.001,0.550287)
+            (0.0001,0.581284)
+        }
+        ;
+    \addplot+[very thick]
+        coordinates {
+            (1.0,4.944617)
+            (0.1,5.932735)
+            (0.01,6.161634000000001)
+            (0.001,6.509469999999999)
+            (0.0001,6.758935000000001)
+        }
+        ;
+    \legend{{ALTRO},{ECOS}}
+\end{axis}
+\end{tikzpicture}

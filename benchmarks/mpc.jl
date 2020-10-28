@@ -34,7 +34,6 @@ function gen_tracking_problem(prob::TO.Problem, N;
         if !(con isa GoalConstraint)
             if inds.stop > N
                 inds = inds.start:N-(prob.N - inds.stop)
-                inds = inds.start:N
             end
             TO.add_constraint!(cons, con, inds)
         end

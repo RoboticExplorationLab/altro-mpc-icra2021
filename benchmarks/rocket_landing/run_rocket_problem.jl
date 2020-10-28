@@ -27,6 +27,8 @@ include("rocket_landing_problem.jl")
 # include(joinpath("src", "struct_setup.jl"))
 # include(joinpath("src","make_problem.jl"))
 include(joinpath("src","convert_Altro_to_Convex.jl"))
+include(joinpath("src","utils.jl"))
+include(joinpath("plotting","plot_comparison.jl"))
 
 
 ## Set up initial "cold start" problem
@@ -34,26 +36,37 @@ x0_new = @SVector [4.0, 2.0, 20.0, -3.0, 2.0, -5.0]
 xf_new = @SVector zeros(6)
 N = 301
 dt = 0.05
-theta = 20
+theta = 20 # deg
+glide = 45 # deg
 
+# We ask for a high quality reference trajectory so we allow a lot of
+# iterations to make it happen
 opts = SolverOptions(
     cost_tolerance_intermediate=1e-2,
     penalty_scaling=10.,
     penalty_initial=1.0,
-    verbose = 1,
+    # verbose = 1,
     projected_newton = false,
     constraint_tolerance = 1.0e-8,
+    iterations = 5000,
+    iterations_inner = 100,
+    iterations_linesearch = 100,
+    iterations_outer = 500
 )
-prob = RocketProblem(N, (N-1)*dt, x0=x0_new, θ_max=theta, integration=Exponential)
+prob = RocketProblem(N, (N-1)*dt,
+                            x0=x0_new,
+                            θ_thrust_max=theta,
+                            θ_glideslope=glide,
+                            integration=Exponential)
 solver = ALTROSolver(prob, opts, show_summary=true)
 Altro.solve!(solver)
 
 ## Set up MPC problem
-Random.seed!(1)
+Random.seed!(10)
 opts_mpc = SolverOptions(
-    cost_tolerance = 1e-4,
-    cost_tolerance_intermediate = 1e-4,
-    constraint_tolerance = 1e-4,
+    cost_tolerance = 1e-8,
+    cost_tolerance_intermediate = 1e-8,
+    constraint_tolerance = 1e-8,
     projected_newton = false,
     penalty_initial = 10.,
     penalty_scaling = 100.,
@@ -69,15 +82,55 @@ prob_mpc = RocketProblemMPC(prob, N_mpc,
     Rk = 1e-1,
 )
 
-prob_mpc.x0
 Z_track = prob.Z
-X, res = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track)
+X, X_ecos, U_ecos, res = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track)
 
-println("Mean Time       = $(mean(res[:time],dims=1)[1])")
-println("Mean Iterations = $(mean(res[:iter],dims=1)[1])")
-println("Mean Traj Error = $(mean(res[:err_traj],dims=1)[1])")
-println("Mean X0 Error   = $(mean(res[:err_x0],dims=1)[1])")
+println("Median Time          = $(median(res[:time],dims=1)[1])")
+println("Median Iterations    = $(median(res[:iter],dims=1)[1])")
+println("Median State Error   = $(median(res[:err_traj],dims=1)[1])")
+println("Median Control Error = $(median(res[:err_traj],dims=1)[2])")
+println("Median X0 Error      = $(median(res[:err_x0],dims=1)[2])")
 
+model = prob_mpc.model
+X_e = SVector{6}.(eachcol(evaluate(X_ecos)))
+U_e = SVector{3}.(eachcol(evaluate(U_ecos)))
+Xprime = [discrete_dynamics(PassThrough, model, X_e[i], U_e[i], 0, dt)
+                                                            for i = 1:N_mpc-1]
+norm(Xprime - X_e[2:end],Inf)
+
+##
 using Plots
-plot(X, inds=1:3)
-plot!(states(Z_track), inds=1:3, color=[1 2 3], linestyle=:dash)
+time_plt = plot(X, inds=1:3)
+plot!((N - N_mpc):(N - 1), X_e, inds=1:3, color=[1 2 3], linestyle=:dash)
+plot!((N - N_mpc):(N - 1), states(prob_mpc.Z), inds=1:3, color=[1 2 3], linestyle=:dash)
+plot!(states(prob.Z), inds=1:3, color=[1 2 3], linestyle=:dot)
+display(time_plt)
+
+err_plt = plot(res[:err_traj][:, 1], yaxis = :log, labels = "State Error",
+                                                    legend = :topleft)
+plot!(res[:err_traj][:, 2], yaxis = :log, labels = "Control Error")
+xlabel!("Iterations")
+ylabel!("Error")
+title!("State and Control Error between ALTRO and ECOS")
+display(err_plt)
+
+time_plt = plot(res[:time][:, 1], labels = "ALTRO Times", legend = :topleft)
+plot!(res[:time][:, 2], labels = "ECOS Time")
+xlabel!("Iterations")
+ylabel!("Time (ms)")
+title!("Solve Time between ALTRO and ECOS over Iterations")
+display(time_plt)
+
+
+xs = getArrAtInd(X, 1)
+ys = getArrAtInd(X, 2)
+zs = getArrAtInd(X, 3)
+
+laterals = [norm([xs[i]; ys[i]]) for i in 1:length(xs)]
+angle = atand.(laterals, zs)
+
+angle_plt = plot(angle, label = "Angle", legend = :bottomright)
+hline!([glide], label = "Glideslope Limit", linestyle = :dash, color = :grey)
+xlabel!("Iterations")
+ylabel!("Angle (deg)")
+title!("Slope Angle over Trajectory")

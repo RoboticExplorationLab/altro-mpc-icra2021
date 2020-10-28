@@ -1,4 +1,4 @@
-using Convex, LinearAlgebra, Mosek, MosekTools
+using Convex, LinearAlgebra, ECOS #, Mosek, MosekTools
 
 
 function S(vec)
@@ -8,6 +8,7 @@ function S(vec)
             -vec[2] vec[1] 0     ]
 end
 
+println("Starting Soft-Landing with ECOS")
 
 # angular velocity of mars
 w_mars = [  0 ;  6.62e-5   ;  2.53e-5  ]
@@ -97,24 +98,33 @@ push!(constraints, velocity[:, T] == final_velocity)
 push!(constraints, position[1,T] == 0.0)
 
 # minimze distance from landing spot
+# solver = COSMO.Optimizer(max_iter = 9000)
+ecos_optimizer = ECOS.Optimizer(
+    verbose=0,
+    feastol=1e-6,
+    abstol=1e-6,
+    reltol=1e-6
+)
+
 problem = minimize(sumsquares(position[2:3,T]), constraints)
 # solve!(problem, () -> Mosek.Optimizer())
 # solve!(problem, () -> SDPT3.Optimizer())
-solve!(problem, () -> COSMO.Optimizer(max_iter = 9000))
-
+# solve!(problem,  () -> COSMO.Optimizer(max_iter = 9000))
+Convex.solve!(problem, ecos_optimizer)
+println("Solve Time = $(ecos_optimizer.sol.solve_time)")
 
 pos = evaluate(position)
 
-mat"
-figure
-title('3D position')
-xlabel('X')
-ylabel('Y')
-zlabel('Z')
-hold on
-plot3($pos(1,:),$pos(2,:),$pos(3,:))
-hold off
-"
+# mat"
+# figure
+# title('3D position')
+# xlabel('X')
+# ylabel('Y')
+# zlabel('Z')
+# hold on
+# plot3($pos(1,:),$pos(2,:),$pos(3,:))
+# hold off
+# "
 
 
 
@@ -133,25 +143,25 @@ for i = 1:size(force,2)
 end
 
 
-mat"
-figure
-hold on
-title('Thrust')
-plot($u')
-legend('T_x,T_y,T_z')
-hold off
-"
+# mat"
+# figure
+# hold on
+# title('Thrust')
+# plot($u')
+# legend('T_x,T_y,T_z')
+# hold off
+# "
 
 t_lower = ones(length(unorm))*.2*T_max
 t_upper = ones(length(unorm))*.8*T_max
 
-mat"
-figure
-hold on
-title('Thrust Norm')
-plot($unorm)
-plot(1:length($unorm), $t_lower,'r')
-plot(1:length($unorm), $t_upper,'r')
-legend('Engine Thrust','Minimum Throttle','Maximum Throttle')
-hold off
-"
+# mat"
+# figure
+# hold on
+# title('Thrust Norm')
+# plot($unorm)
+# plot(1:length($unorm), $t_lower,'r')
+# plot(1:length($unorm), $t_upper,'r')
+# legend('Engine Thrust','Minimum Throttle','Maximum Throttle')
+# hold off
+# "
