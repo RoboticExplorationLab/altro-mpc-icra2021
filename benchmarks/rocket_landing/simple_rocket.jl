@@ -1,64 +1,25 @@
-import Pkg; Pkg.activate(joinpath(@__DIR__,"..")); Pkg.instantiate()
-
-using Altro
-using TrajectoryOptimization
-using RobotDynamics
-import RobotZoo.LinearModels: DoubleIntegrator
-const RD = RobotDynamics
-const TO = TrajectoryOptimization
-
-using JuMP
-using OSQP, ECOS, SCS, COSMO
-using SparseArrays
-using BenchmarkTools
-using TimerOutputs
-using Random
-using Profile
-using Statistics
-using LinearAlgebra
-using StaticArrays
-using StatsPlots
-# using ProfileView: @profview
-using StatProfilerHTML
-using JLD2
-using Plots
-
-include("../mpc.jl")
-
-##
-function gen_JuMP_rocket(prob0::Problem, opts::SolverOptions, optimizer;
-        goal_constraint = false
+function gen_JuMP_rocket(prob::Problem, opts::SolverOptions, optimizer;
+        goal_constraint = false,
+        warmstart = true
     )
-    prob = copy(prob0)
-    TO.add_dynamics_constraints!(prob)
     n,m,N = size(prob)
-    nlp = TrajOptNLP(prob, remove_bounds=true)
     NN = N*n + (N-1)*m
     dt = prob.Z[1].dt
-    xinds = nlp.Z.Zdata.xinds
-    uinds = nlp.Z.Zdata.uinds
+
+    inds = reshape(1:(n+m)*N,n+m,N)
+    xinds = [z[1:n] for z in eachcol(inds)]
+    uinds = [z[n+1:end] for z in eachcol(inds)][1:N-1]
 
     # Create the model 
     model = Model(optimizer)
     @variable(model, z[1:NN]) 
-    z0 = vcat([Vector(RD.get_z(z)) for z in get_trajectory(prob0)]...)
-    JuMP.set_start_value.(z, z0)    
+    if warmstart 
+        z0 = vcat([Vector(RD.get_z(z)) for z in get_trajectory(prob)]...)
+        JuMP.set_start_value.(z, z0)    
+    end
 
     # Cost function
-    TO.hess_f!(nlp)
-    P = nlp.data.G
-    q = zeros(n+m, N)
-    for k = 1:N
-        q[1:n,k] .= prob.obj[k].q
-        q[n+1:end,k] .= prob.obj[k].r
-    end
-    dt = prob.Z[1].dt
-    q[:,1:N-1] .*= dt
-    q = q[1:end-m]
-    dts = fill(dt,N_mpc)
-    dts[end] = 1
-    c = [c.c for c in prob.obj]'dts
-
+    P,q,c = get_batch_objective(prob)
     @objective(model, Min, 0.5*dot(z,P,z) + dot(q,z) + c)
 
     # Dynamics Constraints
@@ -77,11 +38,6 @@ function gen_JuMP_rocket(prob0::Problem, opts::SolverOptions, optimizer;
         @constraint(model, z[xinds[N]] .== prob.xf)
     end
 
-    # Ground constraint
-    # for k = 2:N-1
-    #     @constraint(model, z[xinds[1][3]] >= 0)
-    # end
-
     # Thrust cone constraint
     con = prob_mpc.constraints[findfirst(x-> x isa NormConstraint, prob_mpc.constraints)]
     maxThrust = con.val
@@ -97,7 +53,7 @@ function gen_JuMP_rocket(prob0::Problem, opts::SolverOptions, optimizer;
         @constraint(model, [α_max * u3, u1, u2] in JuMP.SecondOrderCone())
     end
 
-    return model, z
+    return model, z, (P,q,c)
 end
 
 function mpc_update(altro, prob_mpc, Z_track, t0, k_mpc)
@@ -106,7 +62,12 @@ function mpc_update(altro, prob_mpc, Z_track, t0, k_mpc)
     # Propagate the system forward w/ noise
     x0 = discrete_dynamics(TO.integration(prob_mpc),
                                 prob_mpc.model, prob_mpc.Z[1])
-    noise = [(@SVector randn(3)) / 100; (@SVector randn(3)) / 1e6]
+    pos_mag = norm(x0[1:3])
+    vel_mag = norm(x0[4:6])
+    noise = [
+        (@SVector randn(3)) * pos_mag / 1000; 
+        (@SVector randn(3)) * vel_mag / 100
+    ]
     x0 += noise
     TO.set_initial_state!(prob_mpc, x0)
 
@@ -120,110 +81,12 @@ function mpc_update(altro, prob_mpc, Z_track, t0, k_mpc)
     Altro.shift_fill!(TO.get_constraints(altro))
 end
 
-function dynamics_violation(prob,X,U)
-    err = [zero(X[1]) for u in U]
-    for k = 1:length(U)
-        t = prob.Z[k].t
-        dt = prob.Z[k].dt
-        err = discrete_dynamics(TO.integration(prob), prob.model, X[k], U[k], t, dt) - X[k+1]
-    end
-    return maximum(norm.(err,Inf))
-end
-
-opts = SolverOptions(
-    constraint_tolerance = 1e-4,
-    cost_tolerance=1e-4,
-    cost_tolerance_intermediate=1e-4,
-    penalty_initial=1e-4,
-    penalty_scaling=2.0
-)
-
-##
-x0_new = @SVector [4.0, 2.0, 20.0, -3.0, 2.0, -5.0]
-xf_new = @SVector zeros(6)
-N = 301
-dt = 0.05
-theta = 5 # deg
-glide = 45 # deg
-
-opts = SolverOptions(
-    cost_tolerance_intermediate=1e-2,
-    penalty_scaling=10.,
-    penalty_initial=1e-2,
-    # verbose = 1,
-    projected_newton = false,
-    constraint_tolerance = 1.0e-5,
-    iterations = 5000,
-    iterations_inner = 100,
-    iterations_linesearch = 100,
-    iterations_outer = 500,
-)
-prob = RocketProblem(N, (N-1)*dt,
-    Qfk=1e4,
-    Rk=1e-0,
-    x0=x0_new,
-    θ_thrust_max=theta,
-    θ_glideslope=glide,
-    integration=Exponential,
-    gravity=SA[0,0,-9.81],
-    include_goal=true,
-    include_thrust_angle=true,
-    include_glideslope=true,
-)
-# initial_controls!(prob, zero.(controls(prob)))
-rollout!(prob)
-plot(states(prob), inds=1:3)
-
-altro = ALTROSolver(prob, opts, show_summary=true, verbose=1)
-Altro.solve!(altro)
-Z_track = TO.get_trajectory(altro)
-
-x_altro = vcat([Vector(RD.get_z(z)) for z in get_trajectory(altro)]...)
-x = [x[1] for x in states(altro)]
-y = [x[2] for x in states(altro)]
-z = [x[3] for x in states(altro)]
-plot(x,y,z, aspect_ratio=:equal)
-plot(controls(altro), inds=1:3)
-U = controls(altro)
-maximum(norm.(controls(altro)))
-maximum([atand(norm(u[1:2])/u[3]) for u in controls(altro)])
-maximum([atand(norm(x[1:2])/x[3]) for x in states(altro)])
-
-
-## Convert to tracking problem
-opts_mpc = SolverOptions(
-    cost_tolerance=1e-6,
-    constraint_tolerance=1e-6,
-    projected_newton=false
-)
-optimizer = JuMP.optimizer_with_attributes(ECOS.Optimizer, 
-    "verbose"=>false,
-    "feastol"=>1e-12,
-    "abstol"=>opts_mpc.cost_tolerance,
-    "reltol"=>opts_mpc.cost_tolerance
-)
-optimizer = JuMP.optimizer_with_attributes(COSMO.Optimizer, "eps_abs"=>1e-12, "eps_rel"=>1e-12)
-# optimizer = JuMP.optimizer_with_attributes(SCS.Optimizer, "eps"=>1e-2, "max_iters"=>10e3)
-
-function test_mpc(prob_mpc, opts_mpc, optimizer)
-    N_mpc = 21
-    prob_mpc = gen_tracking_problem(prob, N_mpc)
-    altro = ALTROSolver(prob_mpc, opts_mpc, show_summary=true)
-    solve!(altro)
-
-    t0 = 2prob.Z[2].t 
-    k_mpc = 3
-    mpc_update(altro, prob_mpc, Z_track, t0, k_mpc)
-    model,z = gen_JuMP_rocket(prob_mpc, altro.opts, optimizer)
-    solve!(altro)
-    optimize!(model)
-
-    # Compare results
-    prob_ = copy(prob_mpc)
+function get_batch_objective(prob)
+    prob_ = copy(prob)
     TO.add_dynamics_constraints!(prob_)
     n,m,N = size(prob_)
     nlp = TrajOptNLP(prob_, remove_bounds=true)
-    
+
     TO.hess_f!(nlp)
     P = nlp.data.G
     q = zeros(n+m, N)
@@ -234,87 +97,105 @@ function test_mpc(prob_mpc, opts_mpc, optimizer)
     dt = prob_.Z[1].dt
     q[:,1:N-1] .*= dt
     q = q[1:end-m]
-    dts = fill(prob_mpc.Z[1].dt,N_mpc)
+    dts = fill(prob_.Z[1].dt,N_mpc)
     dts[end] = 1
-    c = [c.c for c in prob_mpc.obj]'dts
+    c = [c.c for c in prob_.obj]'dts
+    return P,q,c
+end
+
+function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track; 
+        num_iters = length(Z_track) - prob_mpc.N,
+        ecos_tol = opts_mpc.constraint_tolerance,
+        optimizer = JuMP.optimizer_with_attributes(ECOS.Optimizer, 
+            "verbose"=>false,
+            "feastol"=>ecos_tol,
+            "abstol"=>opts_mpc.cost_tolerance,
+            "reltol"=>opts_mpc.cost_tolerance
+        ),
+        benchmark=false
+    )
+    # Setup and solve the first iteration
+    altro = ALTROSolver(prob_mpc, opts_mpc)
+    solve!(altro)
+
+    # Initialize results
+    X_traj = [zero(state(Z_track[1])) for i = 1:num_iters+1]
+    X_traj[1] = state(Z_track[1])
+    err_traj = zeros(num_iters,3)  # columns: [state error, control error, ECOS dynamics error]
+    err_x0 = zeros(num_iters,2)
+    iters = zeros(Int, num_iters,2)
+    times = zeros(num_iters,2)
+    costs = zeros(num_iters,3)
+    X = zero.(states(prob_mpc))
+    U = zero.(controls(prob_mpc))
 
     n,m,N = size(prob_mpc)
+    dt = Z_track[1].dt
     inds = reshape(1:(n+m)*N,n+m,N)
     xinds = [z[1:n] for z in eachcol(inds)]
     uinds = [z[n+1:end] for z in eachcol(inds)][1:N-1]
-
-    x_altro = vcat([Vector(RD.get_z(z)) for z in get_trajectory(altro)]...)
-    norm(value.(z) - x_altro, Inf)
-    X = [value.(z[ind]) for ind in xinds]
-    U = [value.(z[ind]) for ind in uinds]
-    err_X = maximum(norm.(X - states(altro), Inf))
-    err_U = maximum(norm.(U - controls(altro), Inf))
-    err_dyn = dynamics_violation(prob_mpc, X, U)
-
+    dts = fill(dt,N)
     dts[end] = 0
-    Z = Traj(X, U, dts)
-    x_ecos = value.(z)
-    @show cost(prob_mpc)
-    @show 0.5*dot(x_altro,P,x_altro) + q'x_altro + c
-    @show 0.5*dot(x_ecos,P,x_ecos) + q'x_ecos + c
-    @show cost(prob_mpc.obj, Z)
-    @show objective_value(model) 
-    return SA[err_X, err_U, err_dyn]
-end
 
-function get_opts(optimizer, opts)
-    if optimizer === COSMO.Optimizer
-        return ("eps_abs"=>opts.cost_tolerance, "eps_rel"=>opts.cost_tolerance)
-    elseif optimizer == ECOS.Optimizer
-        return ("feastol"=>opts.constraint_tolerance, "abstol"=>opts.cost_tolerance, "reltol"=>opts.cost_tolerance)
-    elseif optimizer == SCS.Optimizer
-        return ("eps"=>opt.cost_tolerance, "verbose"=>false)
+    t0 = 0
+    k_mpc = 1
+    for i = 1:num_iters
+        t0 += dt
+        k_mpc += 1
+
+        # Update the ALTRO solution, advancing forward by 1 time step
+        mpc_update(altro, prob_mpc, Z_track, t0, k_mpc)
+        X_traj[i+1] = prob_mpc.x0
+
+        # Generate a JuMP Model for solving the problem with ECOS
+        model,z,obj0 = gen_JuMP_rocket(prob_mpc, altro.opts, optimizer, warmstart=false)
+
+        # Solve both problems
+        if benchmark
+            b = benchmark_solve!(altro, samples=2, evals=2)
+            altro.stats.tsolve = median(b).time / 1e6
+        else
+           solve!(altro)
+        end
+        optimize!(model)
+        
+        times[i,1] = altro.stats.tsolve
+        times[i,2] = JuMP.solve_time(model) * 1000
+        iters[i,1] = iterations(altro)
+
+        # Compare trajectories
+        x_ecos = value.(z)
+        for k = 1:N
+            X[k] = x_ecos[xinds[k]]
+            k < N && (U[k] = x_ecos[uinds[k]])
+        end
+        err_X = maximum(norm.(X - states(altro), Inf))
+        err_U = maximum(norm.(U - controls(altro), Inf))
+        err_dyn = dynamics_violation(prob_mpc, X, U)
+        err_traj[i,:] = [err_X, err_U, err_dyn]
+    
+        # Compare cost
+        P,q,c = get_batch_objective(prob_mpc)
+        Z = Traj(X, U, dts)
+        x_altro = vcat([Vector(RD.get_z(z)) for z in get_trajectory(altro)]...)
+        J_altro = cost(prob_mpc)
+        J_ecos = objective_value(model)
+        J_ecos2 = cost(prob_mpc.obj, Z) 
+        costs[i,1] = J_altro
+        costs[i,2] = J_ecos2  # equivalent cost
+        costs[i,3] = J_ecos   # includes slack variables?
     end
+    X_traj, Dict(:time=>times, :iter=>iters, :cost=>costs, :err_traj=>err_traj), X, U
 end
 
-test_mpc(prob_mpc, opts_mpc, optimizer)
-dts = fill(prob_mpc.Z[1].dt,N_mpc)
-dts[end] = 1
-c = [c.c for c in prob_mpc.obj]'dts
-
-
-
-##
-using DataFrames
-res = Dict{Symbol,Vector{Union{Float64,Symbol}}}(
-    :err_X => Float64[],
-    :err_U => Float64[],
-    :err_dyn => Float64[],
-    :tol => Float64[],
-    :solver => Symbol[]
-)
-
-for tol in (1e-4,1e-6,1e-8,1e-10)
-    opts = SolverOptions(
-        constraint_tolerance = tol,
-        cost_tolerance=tol
-    )
-    for solver in (COSMO, ECOS)
-        optimizer = JuMP.optimizer_with_attributes(solver.Optimizer, get_opts(solver.Optimizer, opts)...)
-        err_X, err_U, err_dyn = test_mpc(opts_mpc, optimizer) 
-        push!(res[:err_X], err_X)
-        push!(res[:err_U], err_U)
-        push!(res[:err_dyn], err_dyn)
-        push!(res[:tol], tol)
-        push!(res[:solver], Symbol(solver))
+function dynamics_violation(prob,X,U)
+    err = [zero(X[1]) for u in U]
+    for k = 1:length(U)
+        t = prob.Z[k].t
+        dt = prob.Z[k].dt
+        err = discrete_dynamics(TO.integration(prob), prob.model, X[k], U[k], t, dt) - X[k+1]
     end
+    return maximum(norm.(err,Inf))
 end
 
-df = DataFrame(res)
-using Plots
-cosmo_res = df[df.solver .== :COSMO,:]
-ecos_res = df[df.solver .== :ECOS,:]
-plot(title="COSMO", legend=:topleft, xlabel="tolerance", ylabel="error")
-plot!(cosmo_res.tol, cosmo_res.err_X, label="err_X", xscale=:log10, yscale=:log10)
-plot!(cosmo_res.tol, cosmo_res.err_U, label="err_U", xscale=:log10, yscale=:log10)
-plot!(cosmo_res.tol, cosmo_res.err_dyn, label="err_dyn", xscale=:log10, yscale=:log10)
 
-plot(title="ECOS", legend=:topleft, xlabel="tolerance", ylabel="error")
-plot!(ecos_res.tol, ecos_res.err_X, label="err_X", xscale=:log10, yscale=:log10)
-plot!(ecos_res.tol, ecos_res.err_U, label="err_U", xscale=:log10, yscale=:log10)
-plot!(ecos_res.tol, ecos_res.err_dyn, label="err_dyn", xscale=:log10, yscale=:log10)

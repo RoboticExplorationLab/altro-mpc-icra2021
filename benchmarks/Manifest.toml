@@ -880,7 +880,7 @@ version = "0.5.6"
 
 [[TrajectoryOptimization]]
 deps = ["DocStringExtensions", "ForwardDiff", "LinearAlgebra", "MathOptInterface", "RobotDynamics", "Rotations", "SparseArrays", "StaticArrays", "UnsafeArrays"]
-git-tree-sha1 = "5d699f56a7420f3ab07dd128ced7cedd9028b8ca"
+git-tree-sha1 = "589dc94278f01aaf7fe4a167b9ea7ff960ec6c3d"
 repo-rev = "socp"
 repo-url = "https://github.com/RoboticExplorationLab/TrajectoryOptimization.jl.git"
 uuid = "c79d492b-0548-5874-b488-5a62c1d9d0ca"
