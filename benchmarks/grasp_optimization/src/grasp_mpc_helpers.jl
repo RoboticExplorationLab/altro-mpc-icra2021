@@ -54,8 +54,8 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
         cons[4].c[i] = cfriction2[i]
     end
 
+
     i_c = 1 # constraint index
-    i_c = 3
     for i = 1:N_mpc-1
         i_s = i + k_mpc # shift index for v and B matrices
 

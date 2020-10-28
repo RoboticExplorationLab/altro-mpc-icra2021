@@ -9,7 +9,7 @@ mutable struct SquareObject{T} <: AbstractModel
     mass::T     # mass
     j::T        # inertia
     f::T        # max grasp force
-    g::SVector  # gravity
+    g::SVector{3,T}  # gravity
 
     p::Array    # position vectors of contacts wrt object
     v::Array    # inward pointing surface normals at contacts
