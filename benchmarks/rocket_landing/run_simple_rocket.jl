@@ -202,7 +202,7 @@ tol_comp = map(tols) do tol
     SVector{4}(find_max_tolerance(prob, N_mpc, X_ref, U_ref, tol))
 end
 tol_comp_mat = hcat(tol_comp...)
-@save "rocket.jld2" tol_comp=tol_comp_mat res=res
+@save "rocket.jld2" tol_comp=tol_comp_mat res=res tols=tols
 
 plot(tols, tol_comp_mat[3,:], xscale=:log10)
 plot!(tols, tol_comp_mat[4,:])
