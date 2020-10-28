@@ -7,12 +7,13 @@ const TO = TrajectoryOptimization
 using RobotDynamics
 const RD = RobotDynamics
 using JLD2
+using Random
 using Plots
 
 include("grasp_mpc.jl") # Run cold solve and set up MPC tracking problem
 include("src/plotting.jl") # Function for comparison box plots
 
-# Run Benchmark
+## Run Benchmark
 println("Starting MPC Benchmark...")
 Ns = [10, 15, 20, 25, 30, 35]
 results = map(Ns) do N_mpc

@@ -21,7 +21,19 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
     @constraint(prob_mpc_ecos, X_ecos[:,1] .== x0) # Initial condition
 
     # Update ALTRO and ECOS Stage Constraints
+    cons = prob_mpc.constraints
+    traj_inds = k_mpc .+ (1:N_mpc)
+    Atorque = [[o.B[1][i] o.B[2][i]] for i in traj_inds]
+    btorque = [[o.θdd[i],0,0] for i in traj_inds]
+    for i = 1:N_mpc-1
+        cons[1].A[i] = Atorque[i]
+        cons[1].b[i] = btorque[i]
+        cons[2].A[i][1,1:m÷2]     .= o.v[1][i+k_mpc]
+        cons[2].A[i][2,1+m÷2:end] .= o.v[2][i+k_mpc]
+    end
+
     i_c = 1 # constraint index
+    i_c = 3
     for i = 1:N_mpc-1
         i_s = i + k_mpc # shift index for v and B matrices
 
@@ -32,21 +44,20 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
         # Torque Balance
         A = [o.B[1][i_s] o.B[2][i_s]]
         b = [o.θdd[i_s], 0, 0]
-        prob_mpc.constraints[i_c].A .= A
-        prob_mpc.constraints[i_c].b .= b
+        # prob_mpc.constraints[i_c].A .= A
+        # prob_mpc.constraints[i_c].b .= b
+        # i_c += 1
 
         @constraint(prob_mpc_ecos, A*U_ecos[:, i] .== b)
 
-        i_c += 1
-
         # Max Grasp Force
-        prob_mpc.constraints[i_c].A[1,1:Int(m/2)] .= o.v[1][i_s]
-        prob_mpc.constraints[i_c].A[2,1+Int(m/2):end] .= o.v[2][i_s]
-
-        A = copy(prob_mpc.constraints[i_c].A)
+        # prob_mpc.constraints[i_c].A[1,1:Int(m/2)] .= o.v[1][i_s]
+        # prob_mpc.constraints[i_c].A[2,1+Int(m/2):end] .= o.v[2][i_s]
+        # A = copy(prob_mpc.constraints[i_c].A)
+        # i_c += 1
+        A = copy(cons[2].A[i])
         @constraint(prob_mpc_ecos, A[1:end,1:end]*U_ecos[:, i] .<= o.f*ones(2))
 
-        i_c += 1
 
         # SOCP Friction Cone 1
         v1_i = o.v[1][i_s]

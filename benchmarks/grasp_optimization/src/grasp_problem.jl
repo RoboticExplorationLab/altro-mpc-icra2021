@@ -30,18 +30,33 @@ function GraspProblem(o::SquareObject, N = 61, tf = 6.0,
     TO.add_constraint!(conSet, goal, N)
 
     # Stage Constraints
+    Atorque = [[o.B[1][i] o.B[2][i]] for i = 1:N-1]
+    btorque = [[o.θdd[i],0,0] for i = 1:N-1]
+    torque_balance = LinearConstraintTraj(n, m, Atorque, btorque, Equality(), u_ind)
+    add_constraint!(conSet, torque_balance, 1:N-1)
+
+    Agrasp = map(1:N-1) do i
+        A = zeros(2,m)
+        A[1,1:m÷2] = o.v[1][i]
+        A[2,1+m÷2:end] = o.v[2][i]
+        A
+    end
+    bgrasp = [o.f * ones(2) for i = 1:N-1]
+    max_force = LinearConstraintTraj(n, m, Agrasp, bgrasp, Inequality(), u_ind)
+    add_constraint!(conSet, max_force, 1:N-1)
+    
     for i = 1:N-1
         # Torque Balance
         B = [o.B[1][i] o.B[2][i]]
         t_bal = LinearConstraint2(n, m, B, [o.θdd[i],0,0], Equality(), u_ind)
-        TO.add_constraint!(conSet, t_bal, i:i)
+        # TO.add_constraint!(conSet, t_bal, i:i)
 
         # Max Grasp Force
         A = zeros(2, m)
         A[1,1:Int(m/2)] = o.v[1][i]
         A[2,1+Int(m/2):end] = o.v[2][i]
         max_f = LinearConstraint(n, m, A, o.f*ones(2), Inequality(), u_ind)
-        TO.add_constraint!(conSet, max_f, i:i)
+        # TO.add_constraint!(conSet, max_f, i:i)
 
         # SOCP Friction Cone 1
         v1_i = o.v[1][i]
