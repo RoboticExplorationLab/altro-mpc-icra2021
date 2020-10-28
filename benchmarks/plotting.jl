@@ -1,5 +1,6 @@
 using PGFPlotsX, Colors, Statistics
 colors = (altro=colorant"red", osqp=colorant"blue")
+colors = Dict("ALTRO"=>colorant"red", "OSQP"=>colorant"blue", "ECOS"=>colorant"cyan")
 cd(joinpath(@__DIR__,".."))
 IMAGE_DIR = joinpath("figures")
 function PGFBoxPlot(x, y::Real=0, thresh=3*std(x);
@@ -45,18 +46,19 @@ end
 function comparison_plot(results, Ns, xlabel;
         shift=4,
         width=6,
-        ymode="linear"
+        ymode="linear",
+        legend=("ALTRO","OSQP")
     )
     altro = map(zip(Ns,results)) do (N,res)
         times = res[:time][:,1]
         PGFBoxPlot(times, N-shift, plot_outliers=false, width=width,
-            opts=@pgf {color=colors.altro}
+            opts=@pgf {color=colors[legend[1]]}
         )
     end
     osqp = map(zip(Ns,results)) do (N,res)
         times = res[:time][:,2]
         PGFBoxPlot(times, N+shift, plot_outliers=false, width=width,
-            opts=@pgf {color=colors.osqp}
+            opts=@pgf {color=colors[legend[2]]}
         )
     end
     altro_avg = [mean(res[:time][:,1]) for res in results] 
@@ -78,8 +80,8 @@ function comparison_plot(results, Ns, xlabel;
         },
         altro...,
         osqp...,
-        PlotInc({"red","dashed","no marks", "very thick"}, Coordinates(Ns .- shift, altro_avg)),
-        PlotInc({"blue","dashed","no marks", "very thick"}, Coordinates(Ns .+ shift, osqp_avg)),
-        Legend("ALTRO","OSQP")
+        PlotInc({color=colors[legend[1]],"dashed","no marks", "very thick"}, Coordinates(Ns .- shift, altro_avg)),
+        PlotInc({color=colors[legend[2]],"dashed","no marks", "very thick"}, Coordinates(Ns .+ shift, osqp_avg)),
+        Legend(legend...)
     ))
 end

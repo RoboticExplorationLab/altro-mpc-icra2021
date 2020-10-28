@@ -54,5 +54,5 @@ end
 
 # Generate Plots
 timing_results = [results[i][1] for i=1:length(Ns)]
-p = comparison_plot(timing_results, Ns, "knot points (N)", shift=0, width=4)
+p = comparison_plot(timing_results, Ns, "knot points (N)", shift=0, width=4, legend=("ALTRO","ECOS"))
 pgfsave(joinpath(IMAGE_DIR,"grasp_horizon_comp.tikz"), p, include_preamble=false)
