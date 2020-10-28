@@ -55,7 +55,7 @@ function foot_forces!(
 
     jump_model = Model(
         optimizer_with_attributes(
-            ECOS.Optimizer, "feastol"=>1e-4, "abstol"=>1e-4, "reltol"=>1e-4
+            ECOS.Optimizer, "feastol"=>opt.tol, "abstol"=>opt.tol, "reltol"=>opt.tol
         )
     )
     set_silent(jump_model)
@@ -63,29 +63,32 @@ function foot_forces!(
     X = [@variable(jump_model, [i=1:n]) for i=1:N]
     U = [@variable(jump_model, [i=1:m]) for i=1:N-1]
 
-    @objective(jump_model, Min, sum([(X[i] - param.x_ref[i])'*opt.Q*(X[i] - param.x_ref[i]) for i=1:N]) + 
+    @objective(jump_model, Min, sum([(X[i] - param.x_ref[N])'*opt.Q*(X[i] - param.x_ref[N]) for i=1:N]) + 
                     sum([(U[i] - opt.u_ref[i])'*opt.R*(U[i] - opt.u_ref[i]) for i=1:N-1]))
 
     @constraint(jump_model, X[1] .== x_curr)
     for i=1:N-1
         @constraint(jump_model, X[i+1] .== opt.A_vec[i]*X[i] + opt.B_vec[i]*U[i] + opt.d_vec[i])
-        @constraint(jump_model, [opt.μ * U[i][3]; U[i][1:2]] in SecondOrderCone())
-        @constraint(jump_model, 0 <= U[i][3])
-        @constraint(jump_model, opt.max_vert_force >= U[i][3])
+        # for j=1:4
+        #     f_indices = select(j, 3)
+        #     @constraint(jump_model, [opt.μ * U[i][f_indices[3]]; U[i][f_indices[1:2]]] in SecondOrderCone())
+        #     @constraint(jump_model, 0 <= U[i][f_indices[3]])
+        #     @constraint(jump_model, opt.max_vert_force >= U[i][f_indices[3]])
+        # end
     end
 
-    # gets benchmark to return before populating results
-    optimize!(jump_model)
-    b = solve_time(jump_model)
+
+    optimize!(jump_model) 
+    ecos_time = solve_time(jump_model)
+    
+    for i=1:N
+        opt.X0[i] = value.(X[i])
+        i == N && continue 
+        opt.U0[i] = value.(U[i])
+    end
+
+    param.new_info = true
+    param.last_solve_time = ecos_time
+
     param.forces = value.(U[1])
-
-    return b
-end
-
-function select12(i)
-    return SVector{12}((12*(i-1)+1):(12*(i-1)+12))
-end
-
-function select12_3(i, j, k)
-    return 12*(i-1) + 3*(j-1) + k
 end

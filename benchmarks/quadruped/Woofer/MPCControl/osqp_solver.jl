@@ -55,7 +55,7 @@ function update_osqp_model!(param::ControllerParams, x_curr)
             opt.u[select(i,n)] = -opt.d_vec[i]
 
             # x_ref:
-            opt.x_ref_osqp[select(i-1,n)] = param.x_ref[i]
+            opt.x_ref_osqp[select(i-1,n)] = param.x_ref[N]
 
             # u_ref:
             opt.x_ref_osqp[x_end .+ select(i,m)] = opt.u_ref[i]
@@ -82,10 +82,19 @@ function foot_forces!(
 
     # gets benchmark to return before populating results
     b = @benchmark OSQP.solve!($(param.optimizer.model)) samples=1 evals=1
-    results = OSQP.solve!(param.optimizer.model) 
-    param.forces = results.x[n*(N-1) .+ select12(1)]
 
-    return b
+    param.new_info = true
+    param.last_solve_time = b.times[1]
+
+    results = OSQP.solve!(param.optimizer.model) 
+
+    for i=1:N
+        param.optimizer.X0[i] = SVector{12}(i == 1 ? x_curr : results.x[select12(i-1)])
+        i==N && continue
+        param.optimizer.U0[i] = SVector{12}(results.x[n*(N-1) .+ select12(i)])
+    end
+
+    param.forces = results.x[n*(N-1) .+ select12(1)]
 end
 
 function select12(i)

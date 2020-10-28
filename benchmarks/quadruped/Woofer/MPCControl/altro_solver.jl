@@ -2,35 +2,6 @@
 This file turns the discrete MPC problem into a quadratic problem via a sparse
 formulation.
 """
-
-function reference_trajectory!(
-    x_curr::AbstractVector{T},
-    param::ControllerParams,
-) where {T<:Number}
-    # integrate the x,y position from the reference
-
-    # interp_length = Int(round(param.N/3))
-    interp_length = 2
-    α = [collect(range(0, 1, length = interp_length)); ones(param.N - interp_length)]
-
-    # for i = 1:param.N+1
-    #     param.x_ref[i] = (1 - α[i]) * x_curr + α[i] * param.x_des
-    # end
-
-    p_integrate = x_curr[SUnitRange(1,2)]
-    v_i = param.x_des[SUnitRange(7,8)]
-
-    for i=1:param.N
-        if param.vel_ctrl
-			p_integrate += v_i*param.optimizer.dt
-
-			param.x_ref[i] = [p_integrate; ((1 - α[i]) * x_curr + α[i] * param.x_des)[SUnitRange(3, 12)]]
-        else
-            param.x_ref[i] = ((1 - α[i]) * x_curr + α[i] * param.x_des)
-        end
-    end
-end
-
 function update_dynamics_matrices!(param::ControllerParams)
     opt = param.optimizer
 
@@ -65,10 +36,6 @@ function update_dynamics_matrices!(param::ControllerParams)
         opt.model.B[i] = B_c_i * opt.dt + A_c_i*B_c_i*opt.dt^2/2
         opt.model.d[i] = d_c_i * opt.dt + A_c_i*d_c_i*opt.dt^2/2
     end
-
-    # Z = Traj(param.x_ref, opt.u_ref, opt.dt)
-
-    # update_trajectory!(opt.objective, Z)
 end
 
 function foot_forces!(
@@ -93,14 +60,17 @@ function foot_forces!(
     initial_controls!(opt.problem, opt.U0)
     b = @benchmark Altro.solve!($(opt.solver)) samples=1 evals=1
 
+    param.new_info = true
+    param.last_solve_time = b.times[1]
+
     opt.X0 .= states(opt.solver)
     opt.U0 .= controls(opt.solver)
 
     if status(opt.solver) != Altro.SOLVE_SUCCEEDED
         @warn "Solver status: $(opt.solver.stats.status)"
+
+        @show opt.solver.stats
     end
 
     param.forces = opt.U0[1]
-
-    return b
 end

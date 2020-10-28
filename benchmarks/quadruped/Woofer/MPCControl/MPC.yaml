@@ -19,7 +19,7 @@ r:
 mu: 0.5
 max_vert_force: 133.0
 yaw_angle: 0.0
-N: 20
+N: 15
 foot_dx: 0.0
 solver: "OSQP"
 q:

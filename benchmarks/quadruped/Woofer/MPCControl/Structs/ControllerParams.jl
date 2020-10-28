@@ -35,9 +35,13 @@ mutable struct ControllerParams{O,T,S}
     optimizer::O
     gait::GaitParams{T, S}
     swing::SwingLegParams{T}
+
+    # benchmarking information:
+    last_solve_time::T
+    new_info::Bool
 end
 
-function ControllerParams(; solver="", linearized_friction="", T=Float64, S=Int64)
+function ControllerParams(; solver="", linearized_friction="", tol=1e-4, T=Float64, S=Int64)
     # TODO: make sure zeros outputs type T
     data = YAML.load(open(joinpath(@__DIR__, "../MPC.yaml")))
     N = data["N"]
@@ -116,7 +120,8 @@ function ControllerParams(; solver="", linearized_friction="", T=Float64, S=Int6
             μ,
             min_vert_force,
             max_vert_force,
-            linearized_friction=linearized_friction_
+            linearized_friction=linearized_friction_,
+            tol=tol
         )
     elseif solver_ == "OSQP"
         optimizer = OSQPParams(
@@ -127,6 +132,7 @@ function ControllerParams(; solver="", linearized_friction="", T=Float64, S=Int6
             μ,
             min_vert_force,
             max_vert_force,
+            tol=tol
         )
     elseif solver_ == "ECOS"
         optimizer = ECOSParams(
@@ -137,6 +143,7 @@ function ControllerParams(; solver="", linearized_friction="", T=Float64, S=Int6
             μ,
             min_vert_force,
             max_vert_force,
+            tol=tol
         )
     end
 
@@ -201,5 +208,7 @@ function ControllerParams(; solver="", linearized_friction="", T=Float64, S=Int6
         optimizer,
         gait,
         swing,
+        0.0,
+        false
     )
 end

@@ -40,7 +40,8 @@ function AltroParams(
 							    max_vert_force::T;
 							    n::Integer = 12,
 								m::Integer = 12,
-								linearized_friction = true
+								linearized_friction = true,
+								tol = 1e-4
 							) where {T<:Number, S<:Integer}
 		Q = Diagonal(SVector{n}(q))
 		R = Diagonal(SVector{m}(r))
@@ -75,8 +76,6 @@ function AltroParams(
 		TO.add_constraint!(constraints, bound, 1:N)
 
 		# objective
-		Z = Traj(n, m, dt, N)
-		# objective = TO.TrackingObjective(Q, R, Z)
 		objective = LQRObjective(Q, R, Q, x_des, N)
 
 		tf = dt*(N-1)
@@ -84,7 +83,7 @@ function AltroParams(
 		solver = ALTROSolver(problem)
 		set_options!(solver, projected_newton=false, dJ_counter_limit=20)
 		set_options!(solver, reset_duals=false, penalty_scaling=10., penalty_initial=10.0)
-		set_options!(solver, constraint_tolerance=1e-4, cost_tolerance=1e-4)
+		set_options!(solver, constraint_tolerance=tol, cost_tolerance=tol)
 
 		Altro.solve!(solver)
 
