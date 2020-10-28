@@ -23,13 +23,35 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
     # Update ALTRO and ECOS Stage Constraints
     cons = prob_mpc.constraints
     traj_inds = k_mpc .+ (1:N_mpc)
+
+    # Torque Balance
     Atorque = [[o.B[1][i] o.B[2][i]] for i in traj_inds]
     btorque = [[o.θdd[i],0,0] for i in traj_inds]
+
+    # Friction 1
+    Afriction1 = map(traj_inds) do i
+        v = o.v[1][i]
+        (I - v*v')
+    end
+    cfriction1 = [o.mu * o.v[1][i] for i in traj_inds]
+
+    # Friction 2
+    Afriction2 = map(traj_inds) do i
+        v = o.v[2][i]
+        (I - v*v')
+    end
+    cfriction2 = [o.mu * o.v[2][i] for i in traj_inds]
+
+    # Update the constraints
     for i = 1:N_mpc-1
         cons[1].A[i] = Atorque[i]
         cons[1].b[i] = btorque[i]
         cons[2].A[i][1,1:m÷2]     .= o.v[1][i+k_mpc]
         cons[2].A[i][2,1+m÷2:end] .= o.v[2][i+k_mpc]
+        cons[3].A[i] = Afriction1[i]
+        cons[3].c[i] = cfriction1[i]
+        cons[4].A[i] = Afriction2[i]
+        cons[4].c[i] = cfriction2[i]
     end
 
     i_c = 1 # constraint index
@@ -60,26 +82,30 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
 
 
         # SOCP Friction Cone 1
-        v1_i = o.v[1][i_s]
-        prob_mpc.constraints[i_c].A .= (I - v1_i*v1_i')
-        prob_mpc.constraints[i_c].c .= o.mu*v1_i
+        # v1_i = o.v[1][i_s]
+        # prob_mpc.constraints[i_c].A .= (I - v1_i*v1_i')
+        # prob_mpc.constraints[i_c].c .= o.mu*v1_i
 
-        A = copy(prob_mpc.constraints[i_c].A)
-        c = copy(prob_mpc.constraints[i_c].c)
+        # A = copy(prob_mpc.constraints[i_c].A)
+        # c = copy(prob_mpc.constraints[i_c].c)
+        # i_c += 1
+        A = Matrix(cons[3].A[i])
+        c = Vector(cons[3].c[i])
         @constraint(prob_mpc_ecos, [c'*F1; A[1:end,1:end]*F1] in JuMP.SecondOrderCone())
 
-        i_c += 1
 
         # SOCP Friction Cone 2
-        v2_i = o.v[2][i_s]
-        prob_mpc.constraints[i_c].A .= (I - v2_i*v2_i')
-        prob_mpc.constraints[i_c].c .= o.mu*v2_i
+        # v2_i = o.v[2][i_s]
+        # prob_mpc.constraints[i_c].A .= (I - v2_i*v2_i')
+        # prob_mpc.constraints[i_c].c .= o.mu*v2_i
+        # i_c += 1
 
-        A = copy(prob_mpc.constraints[i_c].A)
-        c = copy(prob_mpc.constraints[i_c].c)
+        # A = copy(prob_mpc.constraints[i_c].A)
+        # c = copy(prob_mpc.constraints[i_c].c)
+        A = Matrix(cons[4].A[i])
+        c = Vector(cons[4].c[i])
         @constraint(prob_mpc_ecos, [c'*F2; A[1:end,1:end]*F2] in JuMP.SecondOrderCone())
 
-        i_c += 1
 
         # Dynamics Constraints for ECOS
         pos_ind = 1:3; vel_ind = 4:6 # indices

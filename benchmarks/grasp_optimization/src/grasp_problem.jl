@@ -30,11 +30,14 @@ function GraspProblem(o::SquareObject, N = 61, tf = 6.0,
     TO.add_constraint!(conSet, goal, N)
 
     # Stage Constraints
+
+    # Torque Balance
     Atorque = [[o.B[1][i] o.B[2][i]] for i = 1:N-1]
     btorque = [[o.θdd[i],0,0] for i = 1:N-1]
     torque_balance = LinearConstraintTraj(n, m, Atorque, btorque, Equality(), u_ind)
     add_constraint!(conSet, torque_balance, 1:N-1)
 
+    # Max Grasp Force
     Agrasp = map(1:N-1) do i
         A = zeros(2,m)
         A[1,1:m÷2] = o.v[1][i]
@@ -45,6 +48,24 @@ function GraspProblem(o::SquareObject, N = 61, tf = 6.0,
     max_force = LinearConstraintTraj(n, m, Agrasp, bgrasp, Inequality(), u_ind)
     add_constraint!(conSet, max_force, 1:N-1)
     
+    # SOCP Friction Cone 1
+    Afriction1 = map(1:N-1) do i
+        v = o.v[1][i]
+        (I - v*v')
+    end
+    cfriction1 = [o.mu * o.v[1][i] for i = 1:N-1]
+    friction1 = AffineSOCTraj(n, m, Afriction1, cfriction1, TO.SecondOrderCone(), F1_ind)
+    add_constraint!(conSet, friction1, 1:N-1)
+
+    # SOCP Friction Cone 2
+    Afriction2 = map(1:N-1) do i
+        v = o.v[2][i]
+        (I - v*v')
+    end
+    cfriction2 = [o.mu * o.v[2][i] for i = 1:N-1]
+    friction2 = AffineSOCTraj(n, m, Afriction2, cfriction2, TO.SecondOrderCone(), F2_ind)
+    add_constraint!(conSet, friction2, 1:N-1)
+
     for i = 1:N-1
         # Torque Balance
         B = [o.B[1][i] o.B[2][i]]
@@ -62,15 +83,15 @@ function GraspProblem(o::SquareObject, N = 61, tf = 6.0,
         v1_i = o.v[1][i]
         A1 = (I - v1_i*v1_i')
         c1 = o.mu*v1_i
-        nc1 = FrictionConstraint(n, m, A1, c1, TO.SecondOrderCone(), F1_ind)
-        TO.add_constraint!(conSet, nc1, i:i)
+        nc1 = FrictionConstraint(n, m, Afriction1[i], cfriction1[i], TO.SecondOrderCone(), F1_ind)
+        # TO.add_constraint!(conSet, nc1, i:i)
 
         # SOCP Friction Cone 2
         v2_i = o.v[2][i]
         A2 = (I - v2_i*v2_i')
         c2 = o.mu*v2_i
         nc2 = FrictionConstraint(n, m, A2, c2, TO.SecondOrderCone(), F2_ind)
-        TO.add_constraint!(conSet, nc2, i:i)
+        # TO.add_constraint!(conSet, nc2, i:i)
     end
 
     # Problem

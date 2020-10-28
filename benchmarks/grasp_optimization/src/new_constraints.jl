@@ -10,7 +10,7 @@ struct AffineSOCTraj{S,P,W,T} <: StageConstraint
 	inds::SVector{W,Int}
 	function AffineSOCTraj(n::Int, m::Int, 
 			A::Vector{<:AbstractMatrix}, 
-			c::Vector{<:AbstractMatrix}, 
+			c::Vector{<:AbstractVector}, 
 			sense::ConstraintSense,
 			inds=SVector{n+m}(1:n+m)
 		)
@@ -20,7 +20,7 @@ struct AffineSOCTraj{S,P,W,T} <: StageConstraint
 		elseif inds == :control
 			inds = SVector{m}(n .+ (1:m))
 		end
-		T = promote_type(eltype(eltype(A)), eltype(eltype(b)))
+		T = promote_type(eltype(eltype(A)), eltype(eltype(c)))
 		A = [SizedMatrix{P,W,T}(Ai) for Ai in A]
 		c = [SizedVector{P,T}(ci) for ci in c]
 		@assert length(A) == length(c)
@@ -33,7 +33,7 @@ end
 @inline TO.sense(con::AffineSOCTraj) = con.sense
 @inline Base.length(::AffineSOCTraj{TO.SecondOrderCone,D}) where D = D + 1
 
-function evaluate!(
+function TO.evaluate!(
     vals::Vector{<:AbstractVector},
     con::AffineSOCTraj,
     Z::RD.AbstractTrajectory,
@@ -42,12 +42,12 @@ function evaluate!(
 	for (i,k) in enumerate(inds)
 		z = Z[k].z[con.inds]
 		v = con.A[i] * z 
-		t = con.c'z
+		t = con.c[i]'z
 		vals[i] .= push(v,t)
 	end
 end
 
-function jacobian!(
+function TO.jacobian!(
     ∇c::VecOrMat{<:AbstractMatrix},
     con::AffineSOCTraj{<:Any,D},
     Z::RD.AbstractTrajectory,
@@ -55,8 +55,8 @@ function jacobian!(
     is_const = BitArray(undef, size(∇c))
 ) where D
 	for (i,k) in enumerate(inds)
-		∇c[1:D, con.inds] = con.A
-		∇c[1+D, con.inds] = con.c
+		∇c[i][1:D, con.inds] = con.A[i]
+		∇c[i][1+D, con.inds] = con.c[i]
 		is_const[i] = true
 	end
 end

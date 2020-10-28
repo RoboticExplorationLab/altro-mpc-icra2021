@@ -86,7 +86,7 @@ opts = SolverOptions(
     constraint_tolerance=1e-6
 )
 altro = ALTROSolver(prob_cold, opts, show_summary=true)
-# benchmark_solve!(altro)
+benchmark_solve!(altro)
 Altro.solve!(altro)
 norm(states(altro) - X_ref,Inf)
 states(altro) ≈ X_ref
