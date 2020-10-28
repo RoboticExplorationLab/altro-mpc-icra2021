@@ -7,12 +7,13 @@ using TrajectoryOptimization
 using Altro
 using Statistics
 using LinearAlgebra
-using MATLAB
+# using MATLAB
 using OSQP
 using RobotDynamics
 using RobotZoo
 using StaticArrays
 const RD = RobotDynamics
+const TO = TrajectoryOptimization
 
 function eye(n::Int)
     return diagm(ones(n))
@@ -127,38 +128,38 @@ function generate_AB()
 end
 
 
-function run_flexsat_mpc()
+function run_flexsat_mpc(tol=1e-4)
 
-# get linear system
+# Model 
 Ad, Bd = generate_AB()
 A = copy(Ad)
 B = copy(Bd)
 N = 80
 n,m = size(B)
 
-# cost function
-Q = Diagonal(10*ones(n))
-R = Diagonal(0.1*ones(m))
-Qf = copy(Q)
-
-# control limits
-ū = .01*ones(m)
-
 xf = zeros(n)
 x0 = [.1;.1;.1;zeros(n-3)]
 dt = 0.1 # doesn't matter, just needs to be non-zero
+tf = (N-1)*dt
 model = RD.LinearModel(A, B;dt = .1)
+
+# Objective
+Q = Diagonal(10*ones(n))
+R = Diagonal(0.1*ones(m))
+Qf = copy(Q)
 objective = LQRObjective(Q, R, Qf, xf, N)
+
+# Constraints
 constraints = ConstraintList(n, m, N)
+ū = .01*ones(m)
 bound = BoundConstraint(n, m, u_min=-ū, u_max=ū)
 add_constraint!(constraints, bound, 1:N)
 
-tf = (N-1)*dt
-
+# Solve initial problem  ("cold start")
 problem = Problem(model, objective, xf, tf, x0=x0, constraints=constraints, integration=RD.PassThrough)
 solver = ALTROSolver(problem)
 set_options!(solver, projected_newton=false)
-solve!(solver)
+# solve!(solver)
 
 b = benchmark_solve!(solver)
 
@@ -212,7 +213,8 @@ u = [ueq; uineq]
 # create OSQP object
 m = OSQP.Model()
 # setup problem
-OSQP.setup!(m; P=P, q=q, A=A, l=l, u=u, eps_abs = 1e-6, eps_rel = 1e-6, eps_prim_inf = 1e-6, eps_dual_inf = 1e-6)
+OSQP.setup!(m; P=P, q=q, A=A, l=l, u=u, 
+    eps_abs = 1e-6, eps_rel = 1e-6, eps_prim_inf = 1e-6, eps_dual_inf = 1e-6, verbose = false)
 
 # solve
 results = OSQP.solve!(m)
@@ -241,7 +243,22 @@ mpc_iterations = 45
 osqp_times = zeros(mpc_iterations)
 altro_times = zeros(mpc_iterations)
 x0_new = copy(x0)
+
+# Set MPC options
+set_options!(solver,
+    constraint_tolerance=tol,
+    cost_tolerance=tol,
+    cost_tolerance_intermediate=tol,
+    penalty_initial=100.,
+    penalty_scaling=100.,
+    # reset_duals=false,
+)
+OSQP.update_settings!(m, eps_abs=tol, eps_rel=tol, eps_prim_inf=tol, eps_dual_inf=tol, 
+    verbose=false)
+
 # Random.seed!(2)
+Z = get_trajectory(solver)
+altro_iters = zeros(mpc_iterations)
 for i = 1:mpc_iterations
 
       # now we compare an MPC start
@@ -250,10 +267,11 @@ for i = 1:mpc_iterations
 
       # ALTRO MPC start
       problem.x0 .= x0_new
-      set_options!(solver, projected_newton=false,penalty_initial = 10.0)
       solve!(solver)
       altro_times[i] = solver.stats.tsolve
-
+      altro_iters[i] = iterations(solver)
+    #   RD.shift_fill!(Z)  # shift the primal variables by one time step
+    #   Altro.shift_fill!(TO.get_constraints(solver))  # shift the duals
 
       # OSQP mpc start
       leq = [-x0_new; zeros(N*nx)]
@@ -268,6 +286,7 @@ for i = 1:mpc_iterations
 
 
 end
+println("Averge iters: ", mean(altro_iters))
 
 X_osqp,U_osqp = OSQP_postprocess_mpc(results,N,nx,nu)
 
@@ -328,10 +347,10 @@ A = vec_from_mat(altro_time_mat')
 idx_range = 1:4:45
 Ns = 1:1:45
 osqp = map(zip(Ns[idx_range],Q[idx_range])) do (N,q)
-    PGFBoxPlot(q,N,2*std(q);width=width,opts=@pgf {color=colors.osqp})
+    PGFBoxPlot(q,N,2*std(q);width=width, plot_outliers=false, linewidth="1.5pt", opts=@pgf {color=colors["OSQP"]})
 end
 altro = map(zip(Ns[idx_range],A[idx_range])) do (N,a)
-    PGFBoxPlot(a,N,2*std(a);width=width,opts=@pgf {color=colors.altro})
+    PGFBoxPlot(a,N,2*std(a);width=width, plot_outliers=false, linewidth="1.5pt", opts=@pgf {color=colors["ALTRO"]})
 end
 xlabel = "MPC Steps"
 # ymode = "linear"
@@ -346,10 +365,10 @@ p = @pgf TikzPicture(
             xlabel=xlabel,
             ymode=ymode,
             ylabel="computation time (ms)",
-            xtick=Ns,
+            xtick=idx_range,
             "legend style"={
-                at={"(0.1,0.9)"},
-                anchor="north west"
+                at={"(0.1,0.1)"},
+                anchor="south west"
             }
         },
         altro...,

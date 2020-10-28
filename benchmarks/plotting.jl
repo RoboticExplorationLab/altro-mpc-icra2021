@@ -6,7 +6,8 @@ IMAGE_DIR = joinpath("figures")
 function PGFBoxPlot(x, y::Real=0, thresh=3*std(x);
         opts=(@pgf {}),
         plot_outliers=true,
-        width=6
+        width=6,
+        linewidth="2pt"
     )
     q1,q2,q3 = quantile(x,[0.25, 0.5, 0.75])
     μ = mean(x)
@@ -25,7 +26,7 @@ function PGFBoxPlot(x, y::Real=0, thresh=3*std(x);
         {
             opts...,
             "solid",
-            "line width"="2pt",
+            "line width"=linewidth,
             "forget plot",
             "boxplot prepared" = {
                 "draw direction"="y",
