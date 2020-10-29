@@ -65,6 +65,36 @@ function LinearizedContinuousDynamicsB(
     )
 end
 
+# override dynamics evaluation to improve speed
+function RD.discrete_dynamics(::Type{PassThrough}, model::LinearModel, x, u, t, dt)
+    k = RD.get_k(model, t)
+    dt_model = RD.is_timevarying(model) ? model.times[k+1] - model.times[k] : model.dt
+    
+    A = SMatrix(model.A[k])
+    B = SMatrix(model.B[k])
+    d = SVector(model.d[k])
+
+    p_ind = SLegIndexToRange(1)
+    ϕ_ind = SLegIndexToRange(2)
+    v_ind = SLegIndexToRange(3)
+    ω_ind = SLegIndexToRange(4)
+
+    p₋ = x[p_ind]
+    ϕ₋ = x[ϕ_ind]
+    v₋ = x[v_ind]
+    ω₋ = x[ω_ind]
+
+    p₊ = p₋ + A[p_ind, v_ind]*v₋ + d[p_ind]
+    ϕ₊ = ϕ₋ + A[ϕ_ind, ω_ind]*ω₋ + d[ϕ_ind]
+    v₊ = v₋ + B[v_ind, SLegIndexToRange(1)]*u[SLegIndexToRange(1)] + B[v_ind, SLegIndexToRange(2)]*u[SLegIndexToRange(2)] +
+            B[v_ind, SLegIndexToRange(3)]*u[SLegIndexToRange(3)] + B[v_ind, SLegIndexToRange(4)]*u[SLegIndexToRange(4)] + d[v_ind]
+    ω₊ = ω₋ + B[ω_ind, SLegIndexToRange(1)]*u[SLegIndexToRange(1)] + B[ω_ind, SLegIndexToRange(2)]*u[SLegIndexToRange(2)] +
+            B[ω_ind, SLegIndexToRange(3)]*u[SLegIndexToRange(3)] + B[ω_ind, SLegIndexToRange(4)]*u[SLegIndexToRange(4)] + d[ω_ind]
+
+    xdot = [p₊; ϕ₊; v₊; ω₊]
+    xdot
+end
+
 function reference_trajectory!(
     x_curr::AbstractVector{T},
     param::ControllerParams,
@@ -83,12 +113,14 @@ function reference_trajectory!(
     v_i = param.x_des[SUnitRange(7,8)]
 
     for i=1:param.N
-        if param.vel_ctrl
-			p_integrate += v_i*param.optimizer.dt
+        # if param.vel_ctrl
+		# 	p_integrate += v_i*param.optimizer.dt
 
-			param.x_ref[i] = [p_integrate; ((1 - α[i]) * x_curr + α[i] * param.x_des)[SUnitRange(3, 12)]]
-        else
-            param.x_ref[i] = ((1 - α[i]) * x_curr + α[i] * param.x_des)
-        end
+		# 	param.x_ref[i] = [p_integrate; ((1 - α[i]) * x_curr + α[i] * param.x_des)[SUnitRange(3, 12)]]
+        # else
+        #     param.x_ref[i] = ((1 - α[i]) * x_curr + α[i] * param.x_des)
+        # end
+
+        param.x_ref[i] = param.x_des
     end
 end

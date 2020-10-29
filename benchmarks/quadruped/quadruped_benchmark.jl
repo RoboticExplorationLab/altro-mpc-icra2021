@@ -31,6 +31,14 @@ ecos_times = ecos_times[ecos_times .!= 0.0]
 ecos_times .*= 1e3
 println("Mean ECOS solve time: ", mean(ecos_times), " ms.")
 
+# using Plots
+
+# bins = 0:0.1:4
+# 0.0:0.1:4.0
+
+# histogram(altro_times, bins=bins, fillalpha=0.5)
+# histogram!(osqp_times, bins=bins, fillalpha=0.5)
+
 using JLD2
 
 save_path = joinpath(@__DIR__, "plots/timing_data.jld2")
@@ -39,7 +47,7 @@ save_path = joinpath(@__DIR__, "plots/timing_data.jld2")
 
 include(joinpath(@__DIR__, "plots/create_figures.jl"))
 
-# using Plots
+
 
 # get_states(x,j) = [x[i][j] for i=1:length(x)]
 

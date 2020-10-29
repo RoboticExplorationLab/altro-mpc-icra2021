@@ -33,9 +33,9 @@ function update_dynamics_matrices_ecos!(param::ControllerParams)
             opt.sprung_mass,
         ) 
 
-        opt.A_vec[i] = oneunit(SMatrix{12,12}) + A_c_i * opt.dt + A_c_i^2 * opt.dt^2/2
-        opt.B_vec[i] = B_c_i * opt.dt + A_c_i*B_c_i*opt.dt^2/2
-        opt.d_vec[i] = d_c_i * opt.dt + A_c_i*d_c_i*opt.dt^2/2
+        opt.A_vec[i] = oneunit(SMatrix{12,12}) + A_c_i * opt.dt #+ A_c_i^2 * opt.dt^2/2
+        opt.B_vec[i] = B_c_i * opt.dt #+ A_c_i*B_c_i*opt.dt^2/2
+        opt.d_vec[i] = d_c_i * opt.dt #+ A_c_i*d_c_i*opt.dt^2/2
     end
 end
 

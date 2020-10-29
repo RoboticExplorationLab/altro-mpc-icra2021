@@ -38,9 +38,9 @@ function update_osqp_model!(param::ControllerParams, x_curr)
             opt.sprung_mass,
         ) 
 
-        opt.A_vec[i] = oneunit(SMatrix{12,12}) + A_c_i * opt.dt + A_c_i^2 * opt.dt^2/2
-        opt.B_vec[i] = B_c_i * opt.dt + A_c_i*B_c_i*opt.dt^2/2
-        opt.d_vec[i] = d_c_i * opt.dt + A_c_i*d_c_i*opt.dt^2/2
+        opt.A_vec[i] = oneunit(SMatrix{12,12}) + A_c_i * opt.dt #+ A_c_i^2 * opt.dt^2/2
+        opt.B_vec[i] = B_c_i * opt.dt #+ A_c_i*B_c_i*opt.dt^2/2
+        opt.d_vec[i] = d_c_i * opt.dt #+ A_c_i*d_c_i*opt.dt^2/2
 
         if i==1
             opt.A_osqp[select(1,n), x_end .+ select(1,m)] = opt.B_vec[i]

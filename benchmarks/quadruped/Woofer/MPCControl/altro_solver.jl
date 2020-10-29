@@ -32,9 +32,9 @@ function update_dynamics_matrices!(param::ControllerParams)
         ) 
 
         # Midpoint Discretization
-        opt.model.A[i] = oneunit(SMatrix{12,12}) + A_c_i * opt.dt + A_c_i^2 * opt.dt^2/2
-        opt.model.B[i] = B_c_i * opt.dt + A_c_i*B_c_i*opt.dt^2/2
-        opt.model.d[i] = d_c_i * opt.dt + A_c_i*d_c_i*opt.dt^2/2
+        opt.model.A[i] = oneunit(SMatrix{12,12}) + A_c_i * opt.dt #+ A_c_i^2 * opt.dt^2/2
+        opt.model.B[i] = B_c_i * opt.dt #+ A_c_i*B_c_i*opt.dt^2/2
+        opt.model.d[i] = d_c_i * opt.dt #+ A_c_i*d_c_i*opt.dt^2/2
     end
 
     Z = Traj(param.x_ref, opt.u_ref, opt.model.times)
