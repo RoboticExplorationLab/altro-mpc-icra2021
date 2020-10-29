@@ -37,6 +37,8 @@ save_path = joinpath(@__DIR__, "plots/timing_data.jld2")
 
 @save save_path altro_times osqp_times altro_times_socp ecos_times
 
+include(joinpath(@__DIR__, "plots/create_figures.jl"))
+
 # using Plots
 
 # get_states(x,j) = [x[i][j] for i=1:length(x)]

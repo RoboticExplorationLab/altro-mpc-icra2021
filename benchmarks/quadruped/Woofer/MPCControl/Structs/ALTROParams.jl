@@ -60,6 +60,8 @@ function AltroParams(
 		times = collect(0.0:dt:(tf))
 		model = RD.LinearModel(n, m, is_affine=true, times=times, dt=times[2])
 
+		@assert RD.is_discrete(model)
+
 		constraints = ConstraintList(n,m,N)
 
 		for i=1:4
@@ -88,6 +90,8 @@ function AltroParams(
 			projected_newton=false,
 			penalty_initial=10.,
 			penalty_scaling=100.,
+			reset_duals=false,
+			static_bp = true
 		)
 		solver = ALTROSolver(problem, opts_mpc)
 		# set_options!(solver, projected_newton=false)
