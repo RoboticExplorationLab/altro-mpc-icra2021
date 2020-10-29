@@ -80,10 +80,19 @@ function AltroParams(
 
 		tf = dt*(N-1)
 		problem = TO.Problem(model, objective, x_des, tf, x0=zeros(n), constraints=constraints, integration=RD.PassThrough)
-		solver = ALTROSolver(problem)
-		set_options!(solver, projected_newton=false, dJ_counter_limit=20)
-		set_options!(solver, reset_duals=false, penalty_scaling=10., penalty_initial=10.0)
-		set_options!(solver, constraint_tolerance=tol, cost_tolerance=tol)
+
+		opts_mpc = SolverOptions(
+			cost_tolerance=tol,
+			cost_tolerance_intermediate=1e-3,
+			constraint_tolerance=tol,
+			projected_newton=false,
+			penalty_initial=10.,
+			penalty_scaling=100.,
+		)
+		solver = ALTROSolver(problem, opts_mpc)
+		# set_options!(solver, projected_newton=false)
+		# set_options!(solver, reset_duals=false, penalty_scaling=10., penalty_initial=10.0)
+		# set_options!(solver, constraint_tolerance=tol, cost_tolerance=tol)
 
 		Altro.solve!(solver)
 

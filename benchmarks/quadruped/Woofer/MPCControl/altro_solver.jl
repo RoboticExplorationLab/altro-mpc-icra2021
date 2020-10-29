@@ -61,13 +61,14 @@ function foot_forces!(
     TO.set_initial_state!(opt.problem, x_curr)
 
     # # Shift the initial trajectory
-    # RD.shift_fill!(prob_mpc.Z)
+    Z_prev = Traj(opt.X0, opt.U0, opt.model.times)
+    RD.shift_fill!(Z_prev)
 
-    # # Shift the multipliers and penalties
-    # Altro.shift_fill!(TO.get_constraints(altro))
+    # Shift the multipliers and penalties
+    Altro.shift_fill!(TO.get_constraints(opt.solver))
 
-    initial_states!(opt.problem, opt.X0)
-    initial_controls!(opt.problem, opt.U0)
+    initial_states!(opt.problem, states(Z_prev))
+    initial_controls!(opt.problem, controls(Z_prev))
     Altro.solve!(opt.solver)
 
     param.new_info = true
