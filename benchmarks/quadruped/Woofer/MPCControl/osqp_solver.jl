@@ -81,12 +81,11 @@ function foot_forces!(
     update_osqp_model!(param, x_curr)
 
     # gets benchmark to return before populating results
-    b = @benchmark OSQP.solve!($(param.optimizer.model)) samples=1 evals=1
+    results = OSQP.solve!(param.optimizer.model)
 
     param.new_info = true
-    param.last_solve_time = b.times[1]
-
-    results = OSQP.solve!(param.optimizer.model) 
+    param.last_solve_time = results.info.solve_time
+    param.last_solve_iterations = results.info.iter
 
     for i=1:N
         param.optimizer.X0[i] = SVector{12}(i == 1 ? x_curr : results.x[select12(i-1)])
