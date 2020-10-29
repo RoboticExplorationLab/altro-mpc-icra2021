@@ -7,9 +7,10 @@ rot3(θ) = [1    0       0;
            0 cos(θ) -sin(θ);
            0 sin(θ) cos(θ)]
 
-skew(a) = [  0  -a[3] a[2];
-           a[3]    0 -a[1];
-          -a[2]  a[1]   0  ]
+using Rotations: skew
+# skew(a) = [  0  -a[3] a[2];
+#            a[3]    0 -a[1];
+#           -a[2]  a[1]   0  ]
 
 function generate_pvB_3D(p0, v0, θ)
     T = length(θ)

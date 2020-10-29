@@ -6,7 +6,15 @@ include("../mpc.jl")                # defines tracking problem
 
 function run_grasp_mpc(prob_mpc, opts_mpc, Z_track, 
         num_iters = length(Z_track) - prob_mpc.N; 
-        print_all=true
+        print_all=true,
+        optimizer = JuMP.optimizer_with_attributes(ECOS.Optimizer, 
+            "verbose"=>false,
+            "feastol"=>opts_mpc.constraint_tolerance,
+            "abstol"=>opts_mpc.cost_tolerance,
+            "reltol"=>opts_mpc.cost_tolerance
+        ),
+        warmstart=false,
+        warmstart_dual=false
     )
     n, m, N_mpc = size(prob_mpc)
     o = prob_mpc.model
@@ -23,27 +31,45 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track,
     ecos_controls = copy(altro_controls)
     err_traj = zeros(num_iters,2)
 
-    # ALTRO solver
+    # Solve first iteration 
     altro = ALTROSolver(prob_mpc, opts_mpc)
     set_options!(altro, show_summary=false, verbose=0)
+    solve!(altro)
 
-    # ECOS solver
-    ecos = ECOS.Optimizer(verbose=0,
-                        feastol=opts_mpc.constraint_tolerance,
-                        abstol=opts_mpc.cost_tolerance,
-                        reltol=opts_mpc.cost_tolerance)
+    prob_mpc_ecos, X_ecos, U_ecos = mpc_update!(prob_mpc, o, iter, Z_track)
+    set_optimizer(prob_mpc_ecos, optimizer)
+    optimize!(prob_mpc_ecos)
+    if warmstart_dual
+        duals = [dual.(all_constraints(prob_mpc_ecos, l...)) 
+            for l in list_of_constraint_types(prob_mpc_ecos)]
+    end
 
     for iter in 1:num_iters
         # Updates prob_mpc in place, returns an equivalent ecos problem
         prob_mpc_ecos, X_ecos, U_ecos = mpc_update!(prob_mpc, o, iter, Z_track)
         Altro.shift_fill!(TO.get_constraints(altro))
+        X0 = hcat(Vector.(states(altro))...)
+        U0 = hcat(Vector.(controls(altro))...)
 
         # Solve Altro
         Altro.solve!(altro)
 
         # Solve Ecos
-        JuMP.set_optimizer(prob_mpc_ecos, ()->ecos)
+        if warmstart
+            set_start_value.(X_ecos, X0)
+            set_start_value.(U_ecos, U0)
+        end
+        if warmstart_dual
+            for (i,l) in enumerate(list_of_constraint_types(prob_mpc_ecos))
+                set_dual_start_value.(all_constraints(prob_mpc_ecos, l...), duals[i])
+            end
+        end
+        JuMP.set_optimizer(prob_mpc_ecos, optimizer)
         JuMP.optimize!(prob_mpc_ecos)
+        if warmstart_dual
+            duals = [dual.(all_constraints(prob_mpc_ecos, l...)) 
+                for l in list_of_constraint_types(prob_mpc_ecos)]
+        end
 
         # Compute max infinity norm diff
         diffs = []
@@ -68,7 +94,7 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track,
         altro_iters[iter] = iterations(altro)
         altro_states[iter+1] = state(prob_mpc.Z[1])
         altro_controls[iter] = control(prob_mpc.Z[1])
-        ecos_times[iter] = 1000*ecos.sol.solve_time
+        ecos_times[iter] = 1000*solve_time(prob_mpc_ecos)
         ecos_controls[iter] = value.(U_ecos)[:, 1]
     end
 
@@ -77,51 +103,65 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track,
 
     # Print Solve Time Difference
     ave_diff = mean(ecos_times) - mean(altro_times)
-    println("\nAverage ALTRO solve time was $(round(ave_diff, digits=2)) ms faster than that of ECOS\n")
+    println("\nAverage ALTRO solve time was $(round(ave_diff, digits=2)) ms faster than that of $(solver_name(prob_mpc_ecos))\n")
 
     return res, altro_traj, ecos_controls
 end
 
+## MPC Setup
+o = SquareObject()
+prob_cold = GraspProblem(o,251)
+opts = SolverOptions(
+    verbose = 0,
+    projected_newton=false,
+    cost_tolerance=1e-6,
+    cost_tolerance_intermediate=1e-4,
+    constraint_tolerance=1e-6
+)
+altro = ALTROSolver(prob_cold, opts, show_summary=false)
+Altro.solve!(altro)
+Z_track = get_trajectory(altro)
 
-# ## MPC Setup
-# o = SquareObject()
-# prob_cold = GraspProblem(o,251)
-# opts = SolverOptions(
-#     verbose = 0,
-#     projected_newton=false,
-#     cost_tolerance=1e-6,
-#     cost_tolerance_intermediate=1e-4,
-#     constraint_tolerance=1e-6
-# )
-# altro = ALTROSolver(prob_cold, opts, show_summary=false)
-# Altro.solve!(altro)
-# Z_track = get_trajectory(altro)
+Random.seed!(1)
+opts_mpc = SolverOptions(
+    cost_tolerance=1e-4,
+    cost_tolerance_intermediate=1e-3,
+    constraint_tolerance=1e-4,
+    projected_newton=false,
+    penalty_initial=10_000.,
+    penalty_scaling=100.,
+    # reset_duals = false,
+)
+num_iters = 20 # number of MPC iterations
+N_mpc = 21 # length of the MPC horizon in number of steps
 
-# Random.seed!(1)
-# opts_mpc = SolverOptions(
-#     cost_tolerance=1e-4,
-#     cost_tolerance_intermediate=1e-3,
-#     constraint_tolerance=1e-4,
-#     projected_newton=false,
-#     penalty_initial=10_000.,
-#     penalty_scaling=100.,
-#     # reset_duals = false,
-# )
-# num_iters = 20 # number of MPC iterations
-# N_mpc = 21 # length of the MPC horizon in number of steps
 
-# Q = 1e3
-# R = 1e0
-# Qf = 10.0
+Q = 1e3
+R = 1e0
+Qf = 10.0
 
-# prob_mpc = gen_tracking_problem(prob_cold, N_mpc, Qk = Q, Rk = R, Qfk = Qf)
+iter = 1
+prob_mpc = gen_tracking_problem(prob_cold, N_mpc, Qk = Q, Rk = R, Qfk = Qf)
+prob_mpc_ecos, X_ecos, U_ecos = mpc_update!(prob_mpc, o, iter, Z_track)
+set_start_value.(X_ecos, zeros(size(X_ecos)))
 
-# # Test single run
-# num_iters = 100
-# print_all = false 
-# res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts_mpc, Z_track,
-#                                             num_iters, print_all=print_all)
-# println(mean(res[:iter]))
+m = prob_mpc_ecos
+set_optimizer(m, optimizer)
+optimize!(m)
+l = list_of_constraint_types(m)
+duals = [dual.(all_constraints(prob_mpc_ecos, l...)) 
+    for l in list_of_constraint_types(prob_mpc_ecos)]
+l = list_of_constraint_types(m)
+duals = [dual.(all_constraints(m, li...)) for li in l]
+set_dual_start_value.(all_constraints(m, l[1]...), duals[1])
+
+# Test single run
+num_iters = 100
+print_all = false 
+res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts_mpc, Z_track,
+                                            num_iters, print_all=print_all)
+println(mean(res[:iter]))
+
 
 ## Histogram of timing results
 # altro_times = res[:time][:,1]

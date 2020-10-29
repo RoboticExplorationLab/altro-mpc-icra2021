@@ -1,63 +1,113 @@
 \begin{tikzpicture}
-\begin{axis}[ymajorgrids, xmajorgrids, xlabel={knot points (N)}, ymode={linear}, ylabel={computation time (ms)}, xtick={11,21,31,41,51}, legend style={at={(0.1,0.9)}, anchor={north west}}]
-    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={11}, lower whisker={0.197368}, lower quartile={0.27115275}, median={0.3116465}, upper quartile={0.41517649999999995}, upper whisker={0.687919}, box extend={4}}, mark options={scale={0.5}}]
+\begin{axis}[legend style={at={(0.1,0.9)}, anchor={north west}}]
+    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, no markers, dashed, forget plot]
         coordinates {
+            (11,0.253279)
+            (21,0.4721875)
+            (31,0.5340867499999999)
+            (41,0.90447975)
+            (51,1.115562)
         }
         ;
-    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={21}, lower whisker={0.33207}, lower quartile={0.47407225}, median={0.592298}, upper quartile={0.7314729999999999}, upper whisker={1.2874079999999999}, box extend={4}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, no markers, dashed, forget plot]
         coordinates {
+            (11,3.6201637499999997)
+            (21,7.99354275)
+            (31,13.1810485)
+            (41,15.48235825)
+            (51,20.857771749999998)
         }
         ;
-    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={31}, lower whisker={0.46754799999999996}, lower quartile={0.55651625}, median={0.724369}, upper quartile={0.91592175}, upper whisker={1.655068}, box extend={4}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,1.0;green,0.6471;blue,0.0}, no markers, dashed, forget plot]
         coordinates {
+            (11,0.61798095703125)
+            (21,1.1260509490966797)
+            (31,1.695394515991211)
+            (41,2.9337406158447266)
+            (51,3.68499755859375)
         }
         ;
-    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={41}, lower whisker={0.6156849999999999}, lower quartile={0.8894055}, median={1.1089514999999999}, upper quartile={1.3746572499999998}, upper whisker={2.2636089999999998}, box extend={4}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,0.502;green,0.0;blue,0.502}, no markers, dashed, forget plot]
         coordinates {
+            (11,5.50532341003418)
+            (21,10.287106037139893)
+            (31,16.17223024368286)
+            (41,22.480249404907227)
+            (51,24.43873882293701)
         }
         ;
-    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={51}, lower whisker={0.823201}, lower quartile={1.1808105}, median={1.4392795}, upper quartile={1.85458475}, upper whisker={3.1640759999999997}, box extend={4}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, no markers, dashed, forget plot]
         coordinates {
+            (11,0.376838)
+            (21,0.7254915)
+            (31,0.9216679999999999)
+            (41,1.35170025)
+            (51,1.46607975)
         }
         ;
-    \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={11}, lower whisker={2.9396829999999996}, lower quartile={3.66770025}, median={3.947158}, upper quartile={4.107046}, upper whisker={4.944474}, box extend={4}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, no markers, dashed, forget plot]
         coordinates {
+            (11,4.0859175)
+            (21,9.39351525)
+            (31,14.950867999999998)
+            (41,20.55986525)
+            (51,26.74002325)
         }
         ;
-    \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={21}, lower whisker={5.896044}, lower quartile={8.231435750000001}, median={8.949504000000001}, upper quartile={9.515305249999999}, upper whisker={11.74306}, box extend={4}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,1.0;green,0.6471;blue,0.0}, no markers, dashed, forget plot]
         coordinates {
+            (11,0.8189678192138672)
+            (21,1.5870928764343262)
+            (31,2.3513436317443848)
+            (41,3.0570030212402344)
+            (51,3.812849521636963)
         }
         ;
-    \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={31}, lower whisker={10.749115}, lower quartile={13.58066575}, median={14.513651500000002}, upper quartile={15.27721525}, upper whisker={18.778817}, box extend={4}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,0.502;green,0.0;blue,0.502}, no markers, dashed, forget plot]
         coordinates {
+            (11,10.025978088378906)
+            (21,17.615556716918945)
+            (31,25.65133571624756)
+            (41,32.62042999267578)
+            (51,37.65946626663208)
         }
         ;
-    \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={41}, lower whisker={13.460956}, lower quartile={15.7082355}, median={17.6687765}, upper quartile={20.0973125}, upper whisker={26.726043}, box extend={4}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, very thick, mark={*}, mark options={fill={rgb,1:red,1.0;green,0.0;blue,0.0}}]
         coordinates {
+            (11,0.3233278916666668)
+            (21,0.5922806956521739)
+            (31,0.8507207181818184)
+            (41,1.1691961285714285)
+            (51,1.3630666749999998)
         }
         ;
-    \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, solid, line width={2pt}, forget plot, boxplot prepared={draw direction={y}, draw position={51}, lower whisker={16.208408000000002}, lower quartile={20.751342}, median={23.6701615}, upper quartile={26.69134525}, upper whisker={33.758332}, box extend={4}}, mark options={scale={0.5}}]
+    \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, very thick, mark={*}, mark options={fill={rgb,1:red,0.0;green,1.0;blue,1.0}}]
         coordinates {
+            (11,3.954750829166666)
+            (21,8.757612169565217)
+            (31,14.192577022727265)
+            (41,18.252659428571434)
+            (51,23.551523440000008)
         }
         ;
-    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, dashed, no marks, very thick]
+    \addplot+[color={rgb,1:red,1.0;green,0.6471;blue,0.0}, very thick, mark={*}, mark options={fill={rgb,1:red,1.0;green,0.6471;blue,0.0}}]
         coordinates {
-            (11,0.3541897291666667)
-            (21,0.6254867739130434)
-            (31,0.8058502954545452)
-            (41,1.1438625999999998)
-            (51,1.553124155)
+            (11,0.8558968702952067)
+            (21,1.498319791710895)
+            (31,2.346218716014515)
+            (41,3.1350340162004744)
+            (51,3.9670002460479736)
         }
         ;
-    \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, dashed, no marks, very thick]
+    \addplot+[color={rgb,1:red,0.502;green,0.0;blue,0.502}, very thick, mark={*}, mark options={fill={rgb,1:red,0.502;green,0.0;blue,0.502}}]
         coordinates {
-            (11,3.888422341666666)
-            (21,8.881034747826087)
-            (31,14.544452872727273)
-            (41,18.210359742857147)
-            (51,23.439877910000003)
+            (11,8.13942551612854)
+            (21,14.543953149215035)
+            (31,21.681677211414684)
+            (41,27.994041215805783)
+            (51,31.765806674957275)
         }
         ;
-    \legend{{ALTRO},{ECOS}}
+    \legend{{ALTRO},{ECOS},{COSMO},{Mosek}}
 \end{axis}
 \end{tikzpicture}

@@ -5,7 +5,7 @@ cd(@__DIR__)
 import YAML
 
 tf = 2.0
-
+ENV["MUJOCO_KEY_PATH"] = "/home/brian/mujoco200_linux/bin/mjkey.txt"
 include("mujoco_test.jl")
 
 # altro_socp_controller = MPCControl.ControllerParams(solver = "Altro", linearized_friction = false, tol=1e-8)

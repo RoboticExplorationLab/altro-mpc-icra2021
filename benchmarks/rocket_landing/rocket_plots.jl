@@ -42,8 +42,8 @@ p = @pgf Axis(
             anchor="south east"
         }
     },
-    PlotInc({"very thick"}, Coordinates(tols, tol_comp[1,:])),
-    PlotInc({"very thick"}, Coordinates(tols, tol_comp[2,:])),
+    PlotInc({color=colors["ALTRO"], "very thick", "mark options"={fill=colors["ALTRO"]}}, Coordinates(tols, tol_comp[1,:])),
+    PlotInc({color=colors["ECOS"], "very thick", "mark options"={fill=colors["ECOS"]}}, Coordinates(tols, tol_comp[2,:])),
     Legend("ALTRO","ECOS")
 )
 pgfsave(joinpath(IMAGE_DIR, "rocket_solver_tol.tikz"), p, include_preamble=false)
