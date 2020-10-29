@@ -1,8 +1,11 @@
-import Pkg; Pkg.activate(@__DIR__); Pkg.instantiate()
+import Pkg; Pkg.activate(joinpath(@__DIR__,".."));
+Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/Lyceum/LyceumRegistry.git"))
+Pkg.instantiate()
+cd(@__DIR__)
 import YAML
 
 tf = 2.0
-
+ENV["MUJOCO_KEY_PATH"] = "/home/brian/mujoco200_linux/bin/mjkey.txt"
 include("mujoco_test.jl")
 
 # ALTRO w/ Linearized Friction Cone Benchmark:

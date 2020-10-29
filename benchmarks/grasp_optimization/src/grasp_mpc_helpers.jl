@@ -18,7 +18,8 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
 
     # Setup ECOS
     prob_mpc_ecos, X_ecos, U_ecos = gen_ECOS(prob_mpc, k_mpc+1, Z_track)
-    @constraint(prob_mpc_ecos, X_ecos[:,1] .== x0) # Initial condition
+    con = @constraint(prob_mpc_ecos, X_ecos[:,1] .== x0) # Initial condition
+    set_name(con, "initial_condition")
 
     # Update ALTRO and ECOS Stage Constraints
     cons = prob_mpc.constraints
@@ -70,15 +71,15 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
         # prob_mpc.constraints[i_c].b .= b
         # i_c += 1
 
-        @constraint(prob_mpc_ecos, A*U_ecos[:, i] .== b)
+        @constraint(prob_mpc_ecos, Matrix(Atorque[i])*U_ecos[:, i] .== Vector(btorque[i]))
 
         # Max Grasp Force
         # prob_mpc.constraints[i_c].A[1,1:Int(m/2)] .= o.v[1][i_s]
         # prob_mpc.constraints[i_c].A[2,1+Int(m/2):end] .= o.v[2][i_s]
         # A = copy(prob_mpc.constraints[i_c].A)
         # i_c += 1
-        A = copy(cons[2].A[i])
-        @constraint(prob_mpc_ecos, A[1:end,1:end]*U_ecos[:, i] .<= o.f*ones(2))
+        A = Matrix((cons[2].A[i]))
+        @constraint(prob_mpc_ecos, A*U_ecos[:, i] .<= o.f*ones(2))
 
 
         # SOCP Friction Cone 1

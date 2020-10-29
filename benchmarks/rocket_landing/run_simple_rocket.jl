@@ -60,24 +60,27 @@ prob = RocketProblem(N, (N-1)*dt,
     include_thrust_angle=true,
     include_glideslope=true,
 )
-# initial_controls!(prob, zero.(controls(prob)))
 rollout!(prob)
-plot(states(prob), inds=1:3)
 
+# Solve Cold Start
 altro = ALTROSolver(prob, opts, show_summary=true, verbose=1)
 Altro.solve!(altro)
+
+# Extract reference trajectory
 Z_track = TO.get_trajectory(altro)
 
+# Plot the solution
 x_altro = vcat([Vector(RD.get_z(z)) for z in get_trajectory(altro)]...)
 x = [x[1] for x in states(altro)]
 y = [x[2] for x in states(altro)]
 z = [x[3] for x in states(altro)]
 plot(x,y,z, aspect_ratio=:equal)
-plot(controls(altro), inds=1:3)
+
+# Check if the solution lies on the SOCP boundaries
 U = controls(altro)
-maximum(norm.(controls(altro)))
-maximum([atand(norm(u[1:2])/u[3]) for u in controls(altro)])
-maximum([atand(norm(x[1:2])/x[3]) for x in states(altro)])
+maxthrust = maximum(norm.(controls(altro)))
+thrustangle = maximum([atand(norm(u[1:2])/u[3]) for u in controls(altro)])  # less than 5
+glideslope = maximum([atand(norm(x[1:2])/x[3]) for x in states(altro)])     # less than 45
 
 
 ## Convert to tracking problem
@@ -97,9 +100,11 @@ X_traj, res = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track, ecos_tol=1e-4)
 println("Average number of iterations: ", mean(res[:iter][:,1]))
 times = mean(res[:time], dims=1)
 @printf("Average times: ALTRO-%0.2f ms, ECOS-%0.2f ms", times[1], times[2])
-@save "rocket.jld2" res=res
+std(res[:time], dims=1)
+@save joinpath(@__DIR__, "rocket.jld2") res=res
 
 # Show actual vs reference trajectory 
+@load joinpath(@__DIR__, "rocket.jld2") res
 plot(states(Z_track), inds=1:3, linestyle=:dash, label="reference")
 plot!(X_traj, inds=1:3, color=[1 2 3], linewidth=2, label="actual")
 

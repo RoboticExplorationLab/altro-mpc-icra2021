@@ -12,7 +12,7 @@ function gen_random_linear(n,m,N, dt=0.1)
     R = Diagonal(0.1*ones(m))
     Qf = Q * (N-1)
 
-    u_bnd = 3  # 2 sigma
+    u_bnd = 3  # 3 sigma
 
     x0 = @SVector zeros(n)
     xf = copy(x0) 

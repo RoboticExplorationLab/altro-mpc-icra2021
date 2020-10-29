@@ -1,6 +1,12 @@
 using PGFPlotsX, Colors, Statistics
 colors = (altro=colorant"red", osqp=colorant"blue")
-colors = Dict("ALTRO"=>colorant"red", "OSQP"=>colorant"blue", "ECOS"=>colorant"cyan")
+colors = Dict(
+    "ALTRO"=>colorant"red", 
+    "OSQP"=>colorant"blue", 
+    "ECOS"=>colorant"cyan",
+    "COSMO"=>colorant"orange",
+    "Mosek"=>colorant"purple"
+)
 cd(joinpath(@__DIR__,".."))
 IMAGE_DIR = joinpath("figures")
 function PGFBoxPlot(x, y::Real=0, thresh=3*std(x);
@@ -50,20 +56,33 @@ function comparison_plot(results, Ns, xlabel;
         ymode="linear",
         legend=("ALTRO","OSQP")
     )
-    altro = map(zip(Ns,results)) do (N,res)
-        times = res[:time][:,1]
-        PGFBoxPlot(times, N-shift, plot_outliers=false, width=width,
-            opts=@pgf {color=colors[legend[1]]}
+    bplots = map(1:length(legend)) do i 
+        altro = map(zip(Ns,results)) do (N,res)
+            times = res[:time][:,i]
+            PGFBoxPlot(times, N-shift, plot_outliers=false, width=width,
+                opts=@pgf {color=colors[legend[i]]}
+            )
+        end
+    end
+    # osqp = map(zip(Ns,results)) do (N,res)
+    #     times = res[:time][:,2]
+    #     PGFBoxPlot(times, N+shift, plot_outliers=false, width=width,
+    #         opts=@pgf {color=colors[legend[2]]}
+    #     )
+    # end
+    avgs = map(1:length(legend)) do i
+        @pgf PlotInc(
+            {
+                color=colors[legend[i]], 
+                "dashed", 
+                "no marks", 
+                "very thick"
+            },  
+            Coordinates(Ns, [mean(res[:time][:,i]) for res in results])
         )
     end
-    osqp = map(zip(Ns,results)) do (N,res)
-        times = res[:time][:,2]
-        PGFBoxPlot(times, N+shift, plot_outliers=false, width=width,
-            opts=@pgf {color=colors[legend[2]]}
-        )
-    end
-    altro_avg = [mean(res[:time][:,1]) for res in results] 
-    osqp_avg = [mean(res[:time][:,2]) for res in results] 
+    # altro_avg = [mean(res[:time][:,1]) for res in results] 
+    # osqp_avg = [mean(res[:time][:,2]) for res in results] 
     p = @pgf TikzPicture(
         Axis(
         {
@@ -79,10 +98,12 @@ function comparison_plot(results, Ns, xlabel;
                 anchor="north west"
             }
         },
-        altro...,
-        osqp...,
-        PlotInc({color=colors[legend[1]],"dashed","no marks", "very thick"}, Coordinates(Ns .- shift, altro_avg)),
-        PlotInc({color=colors[legend[2]],"dashed","no marks", "very thick"}, Coordinates(Ns .+ shift, osqp_avg)),
+        bplots...,
+        avgs...,
+        # altro...,
+        # osqp...,
+        # PlotInc({color=colors[legend[1]],"dashed","no marks", "very thick"}, Coordinates(Ns .- shift, altro_avg)),
+        # PlotInc({color=colors[legend[2]],"dashed","no marks", "very thick"}, Coordinates(Ns .+ shift, osqp_avg)),
         Legend(legend...)
     ))
 end

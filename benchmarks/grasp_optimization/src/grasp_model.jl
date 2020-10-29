@@ -65,7 +65,7 @@ function dynamics(model::SquareObject, x, u)
     F2 = u[nqd+1:end]
     qdd = F1/m + F2/m + g
 
-    return SVector{model.n}([qd; qdd])
+    return SVector{6}([qd; qdd])
 end
 
 RobotDynamics.state_dim(o::SquareObject) = o.n

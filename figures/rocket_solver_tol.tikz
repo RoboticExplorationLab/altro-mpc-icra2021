@@ -1,6 +1,6 @@
 \begin{tikzpicture}
 \begin{axis}[ylabel={solver tolerance}, xlabel={optimality tolerance}, xmode={log}, ymode={log}, legend style={at={(0.9,0.1)}, anchor={south east}}]
-    \addplot+[very thick]
+    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, very thick, mark options={fill={rgb,1:red,1.0;green,0.0;blue,0.0}}]
         coordinates {
             (1.0,0.09854902768415039)
             (0.1,0.0002321253952550468)
@@ -9,7 +9,7 @@
             (0.0001,0.0002321253952550468)
         }
         ;
-    \addplot+[very thick]
+    \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, very thick, mark options={fill={rgb,1:red,0.0;green,1.0;blue,1.0}}]
         coordinates {
             (1.0,9.047799515173228e-6)
             (0.1,2.5397160073423467e-8)
