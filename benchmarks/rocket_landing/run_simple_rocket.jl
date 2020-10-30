@@ -197,7 +197,7 @@ optimizer = optimizer_with_attributes(COSMO.Optimizer,
 # Get reference trajectory
 Random.seed!(1)
 prob_mpc = gen_tracking_problem(prob, N_mpc)
-X_traj, res, X_ref, U_ref = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track, num_iters=1, optimizer=optimizer) 
+X_traj, res, X_ref, U_ref = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track, num_iters=1, optimizer=optimizer, tol0=1e-6) 
 norm(X_ref - states(prob_mpc), Inf)
 norm(U_ref - controls(prob_mpc), Inf)
 
@@ -208,6 +208,8 @@ results = map(tols) do tol
     opts_mpc.constraint_tolerance = tol
     opts_mpc.cost_tolerance = tol
     opts_mpc.cost_tolerance_intermediate = tol
+    opts_mpc.gradient_tolerance = tol
+    opts_mpc.gradient_tolerance_intermediate = tol
     opts_mpc.show_summary = false 
     opts_mpc.show_summary = true
     optimizers = (
@@ -248,7 +250,7 @@ results = map(tols) do tol
         println("  Running with $solvername")
         Random.seed!(1)
         prob_mpc = gen_tracking_problem(prob, N_mpc)
-        X_traj, res, X, U = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track, num_iters=1, optimizer=optimizer) 
+        X_traj, res, X, U = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track, num_iters=1, optimizer=optimizer, tol0=1e-6) 
         Xerr_altro = norm(X_ref - states(prob_mpc), Inf)
         Uerr_altro = norm(U_ref - controls(prob_mpc), Inf)
         Xerr_jump  = norm(X_ref - X, Inf) 
@@ -262,10 +264,20 @@ tol_comp = hcat(map(results) do res
 end...)
 @save joinpath(@__DIR__,"rocket.jld2") res=res tols=tols tol_comp=tol_comp
 
+##
 Random.seed!(1)
 prob_mpc = gen_tracking_problem(prob, N_mpc)
+tol = 1e-6
+opts_mpc.constraint_tolerance = tol
+opts_mpc.cost_tolerance = tol
+opts_mpc.cost_tolerance_intermediate = tol
+opts_mpc.gradient_tolerance = tol
+opts_mpc.gradient_tolerance_intermediate = tol
 opts_mpc.verbose=2
-X_traj, res, X, U = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track, num_iters=1, optimizer=optimizer) 
+opts_mpc.show_summary = true
+X_traj, res, X, U, altro = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track, num_iters=1, optimizer=optimizer, tol0=1e-6)
+Xerr_altro = norm(X_ref - states(prob_mpc), Inf)
+Uerr_altro = norm(U_ref - controls(prob_mpc), Inf)
 
 ## Generate plot
 using PGFPlotsX

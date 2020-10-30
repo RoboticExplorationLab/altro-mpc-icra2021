@@ -2,12 +2,12 @@
 \begin{axis}[xlabel={solver tolerance}, ylabel={trajectory error}, ymode={log}, xmode={log}, xmajorgrids, ymajorgrids, x dir={reverse}, legend style={legend columns={-1}, at={(0.5,-0.35)}, anchor={north}}]
     \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, very thick, mark={*}, mark options={fill={rgb,1:red,1.0;green,0.0;blue,0.0}}]
         coordinates {
-            (0.01,0.5305685589017834)
-            (0.0001,4.4227397358872016e-10)
+            (0.01,0.4718642375218645)
+            (0.0001,5.37648570926854e-7)
             (1.0e-6,5.37648570926854e-7)
             (1.0e-8,5.37648570926854e-7)
-            (1.0e-10,5.37648570926854e-7)
-            (1.0e-12,3.3334116005777963e-7)
+            (1.0e-10,5.376479946150001e-7)
+            (1.0e-12,1.9142341834549017e-7)
         }
         ;
     \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, very thick, mark={*}, mark options={fill={rgb,1:red,0.0;green,1.0;blue,1.0}}]
@@ -17,7 +17,7 @@
             (1.0e-6,0.4815970141173691)
             (1.0e-8,0.01333938139418594)
             (1.0e-10,0.007418917855752884)
-            (1.0e-12,0.0074120747931474135)
+            (1.0e-12,0.007419315578865764)
         }
         ;
     \addplot+[color={rgb,1:red,1.0;green,0.6471;blue,0.0}, very thick, mark={*}, mark options={fill={rgb,1:red,1.0;green,0.6471;blue,0.0}}]
@@ -27,7 +27,7 @@
             (1.0e-6,0.03299711986334647)
             (1.0e-8,0.0003657346808336271)
             (1.0e-10,4.08260108446743e-6)
-            (1.0e-12,3.491959077833467e-8)
+            (1.0e-12,3.616677821260818e-8)
         }
         ;
     \addplot+[color={rgb,1:red,0.502;green,0.0;blue,0.502}, very thick, mark={*}, mark options={fill={rgb,1:red,0.502;green,0.0;blue,0.502}}]
@@ -37,7 +37,7 @@
             (1.0e-6,0.06794951979431986)
             (1.0e-8,0.0014973383135485625)
             (1.0e-10,0.0005572630814783138)
-            (1.0e-12,0.00044650981980298894)
+            (1.0e-12,0.0007477735899212115)
         }
         ;
     \legend{{ALTRO},{ECOS},{COSMO},{Mosek}}

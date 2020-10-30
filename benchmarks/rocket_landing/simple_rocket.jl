@@ -112,11 +112,24 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track;
             "abstol"=>opts_mpc.cost_tolerance,
             "reltol"=>opts_mpc.cost_tolerance
         ),
-        benchmark=false
+        benchmark=false,
+        tol0 = nothing 
     )
     # Setup and solve the first iteration
-    altro = ALTROSolver(prob_mpc, opts_mpc)
+    opts0 = copy(opts_mpc)
+    if !isnothing(tol0)
+        opts0.constraint_tolerance = tol0
+        opts0.cost_tolerance = tol0
+        opts0.cost_tolerance_intermediate = tol0
+        opts0.gradient_tolerance = tol0
+    end
+    altro = ALTROSolver(prob_mpc, opts0)
     solve!(altro)
+
+    opts0.constraint_tolerance = opts_mpc.constraint_tolerance 
+    opts0.cost_tolerance = opts_mpc.cost_tolerance 
+    opts0.cost_tolerance_intermediate = opts_mpc.cost_tolerance_intermediate 
+    opts0.gradient_tolerance = opts_mpc.gradient_tolerance 
 
     # Initialize results
     X_traj = [zero(state(Z_track[1])) for i = 1:num_iters+1]
@@ -185,7 +198,7 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track;
         costs[i,2] = J_ecos2  # equivalent cost
         costs[i,3] = J_ecos   # includes slack variables?
     end
-    X_traj, Dict(:time=>times, :iter=>iters, :cost=>costs, :err_traj=>err_traj), X, U
+    X_traj, Dict(:time=>times, :iter=>iters, :cost=>costs, :err_traj=>err_traj), X, U, altro
 end
 
 function dynamics_violation(prob,X,U)
