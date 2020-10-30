@@ -209,6 +209,7 @@ results = map(tols) do tol
     opts_mpc.cost_tolerance = tol
     opts_mpc.cost_tolerance_intermediate = tol
     opts_mpc.show_summary = false 
+    opts_mpc.show_summary = true
     optimizers = (
         JuMP.optimizer_with_attributes(ECOS.Optimizer, 
             "verbose"=>false,
@@ -260,6 +261,11 @@ tol_comp = hcat(map(results) do res
     insert(m[2,:],1,m[1])
 end...)
 @save joinpath(@__DIR__,"rocket.jld2") res=res tols=tols tol_comp=tol_comp
+
+Random.seed!(1)
+prob_mpc = gen_tracking_problem(prob, N_mpc)
+opts_mpc.verbose=2
+X_traj, res, X, U = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track, num_iters=1, optimizer=optimizer) 
 
 ## Generate plot
 using PGFPlotsX

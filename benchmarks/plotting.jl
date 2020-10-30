@@ -56,10 +56,11 @@ function comparison_plot(results, Ns, xlabel;
         ymode="linear",
         legend=("ALTRO","OSQP")
     )
+    shifts = range(-shift, shift, length=length(legend))
     bplots = map(1:length(legend)) do i 
         altro = map(zip(Ns,results)) do (N,res)
             times = res[:time][:,i]
-            PGFBoxPlot(times, N-shift, plot_outliers=false, width=width,
+            PGFBoxPlot(times, N+shifts[i], plot_outliers=false, width=width,
                 opts=@pgf {color=colors[legend[i]]}
             )
         end
