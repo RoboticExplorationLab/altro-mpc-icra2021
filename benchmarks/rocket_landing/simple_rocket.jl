@@ -78,7 +78,7 @@ function mpc_update(altro, prob_mpc, Z_track, t0, k_mpc)
     RD.shift_fill!(prob_mpc.Z)
 
     # Shift the multipliers and penalties
-    Altro.shift_fill!(TO.get_constraints(altro))
+    Altro.shift_fill!(TO.get_constraints(altro.solver_al))
 end
 
 function get_batch_objective(prob)
@@ -97,7 +97,7 @@ function get_batch_objective(prob)
     dt = prob_.Z[1].dt
     q[:,1:N-1] .*= dt
     q = q[1:end-m]
-    dts = fill(prob_.Z[1].dt,N_mpc)
+    dts = fill(prob_.Z[1].dt,N)
     dts[end] = 1
     c = [c.c for c in prob_.obj]'dts
     return P,q,c

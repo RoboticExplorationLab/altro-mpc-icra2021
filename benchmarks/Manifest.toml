@@ -20,7 +20,7 @@ version = "2.3.0"
 
 [[Altro]]
 deps = ["BenchmarkTools", "Crayons", "DocStringExtensions", "Interpolations", "LinearAlgebra", "Logging", "Parameters", "RobotDynamics", "RobotZoo", "Rotations", "SolverLogging", "SparseArrays", "StaticArrays", "Statistics", "TimerOutputs", "TrajectoryOptimization", "UnsafeArrays"]
-git-tree-sha1 = "9cc5156be04ffe569a373fa0dca54f88ba2cda69"
+git-tree-sha1 = "9856f44f20fbc4b709e070f78845d097c7e5095e"
 repo-rev = "socp"
 repo-url = "https://github.com/RoboticExplorationLab/Altro.jl.git"
 uuid = "5dcf52e5-e2fb-48e0-b826-96f46d2e3e73"
@@ -487,6 +487,12 @@ version = "3.100.0+3"
 git-tree-sha1 = "c7aebfecb1a60d59c0fe023a68ec947a208b1e6b"
 uuid = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 version = "1.2.0"
+
+[[LaTeXTabulars]]
+deps = ["ArgCheck", "DocStringExtensions", "Parameters"]
+git-tree-sha1 = "e19c49a2b18b8e98588f666a06bea0c5d3e7b0a6"
+uuid = "266f59ce-6e72-579c-98bb-27b39b5c037e"
+version = "0.1.1"
 
 [[Latexify]]
 deps = ["Formatting", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "Printf", "Requires"]

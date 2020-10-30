@@ -1,0 +1,21 @@
+\begin{tikzpicture}
+\begin{axis}[width=3.5in, height=4cm, ybar, ymajorgrids, enlarge x limits={1.0}, ylabel={computation time (ms)}, xtick={0.0,0.3}, xticklabels={QP,SOCP}, bar width={0.1}, legend style={at={(0.1,0.9)}, anchor={north west}}]
+    \addplot+[color={rgb,1:red,0.0;green,0.0;blue,1.0}, fill={rgb,1:red,0.0;green,0.0;blue,1.0}, error bars/.cd, y dir=both, y explicit, error bar style={black, line width={1.5pt}}, error mark={|}, error mark options={scale={5}, line width={1.5pt}}]
+        coordinates {
+            (0.0,0.5618026818181818) +- (0,0.08878436764139179)
+        }
+        ;
+    \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, fill={rgb,1:red,1.0;green,0.0;blue,0.0}, error bars/.cd, y dir=both, y explicit, error bar style={black, line width={1.5pt}}, error mark={|}, error mark options={scale={5}, line width={1.5pt}}]
+        coordinates {
+            (0.0,0.7624126515151514) +- (0,0.2593337464051646)
+            (0.3,1.292263606060606) +- (0,0.2593337464051646)
+        }
+        ;
+    \addplot+[color={rgb,1:red,0.0;green,1.0;blue,1.0}, fill={rgb,1:red,0.0;green,1.0;blue,1.0}, error bars/.cd, y dir=both, y explicit, error bar style={black, line width={1.5pt}}, error mark={|}, error mark options={scale={5}, line width={1.5pt}}]
+        coordinates {
+            (0.3,4.637522772727273) +- (0,0.4752645742815031)
+        }
+        ;
+    \legend{{OSQP},{ALTRO},{ECOS}}
+\end{axis}
+\end{tikzpicture}

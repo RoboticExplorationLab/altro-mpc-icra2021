@@ -8,7 +8,7 @@ const RD = RobotDynamics
 const TO = TrajectoryOptimization
 
 using JuMP
-using OSQP, ECOS, SCS, COSMO
+using OSQP, ECOS, SCS, COSMO, Mosek, MosekTools
 using SparseArrays
 using BenchmarkTools
 using TimerOutputs
@@ -192,24 +192,108 @@ opts_mpc = SolverOptions(
     show_summary=false
 )
 optimizer = optimizer_with_attributes(COSMO.Optimizer, 
-    "verbose"=>false, "eps_abs"=>1e-12, "eps_rel"=>1e-12)
+    "verbose"=>false, "eps_abs"=>1e-14, "eps_rel"=>1e-14)
 
 # Get reference trajectory
 Random.seed!(1)
 prob_mpc = gen_tracking_problem(prob, N_mpc)
-X_traj, _, X_ref, U_ref = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track, num_iters=1, optimizer=optimizer) 
+X_traj, res, X_ref, U_ref = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track, num_iters=1, optimizer=optimizer) 
 norm(X_ref - states(prob_mpc), Inf)
 norm(U_ref - controls(prob_mpc), Inf)
 
-find_max_tolerance(prob, N_mpc, X_ref, U_ref, 1e-4)
-tols = [1e-0, 1e-1, 1e-2, 1e-3, 1e-4]
-tol_comp = map(tols) do tol
-    SVector{4}(find_max_tolerance(prob, N_mpc, X_ref, U_ref, tol))
+
+tols = [1e-2,1e-4,1e-6,1e-8,1e-10,1e-12]
+results = map(tols) do tol
+    println("Running at tolerance $tol")
+    opts_mpc.constraint_tolerance = tol
+    opts_mpc.cost_tolerance = tol
+    opts_mpc.cost_tolerance_intermediate = tol
+    opts_mpc.show_summary = false 
+    optimizers = (
+        JuMP.optimizer_with_attributes(ECOS.Optimizer, 
+            "verbose"=>false,
+            "feastol"=>opts_mpc.constraint_tolerance,
+            "abstol"=>opts_mpc.cost_tolerance,
+            "reltol"=>opts_mpc.cost_tolerance
+        ),
+        optimizer_with_attributes(COSMO.Optimizer,
+            "verbose"=>false,
+            "eps_abs"=>tol,
+            "eps_rel"=>tol,
+            "rho"=>1e-2,
+            "scaling"=>0,
+            "alpha"=>1.0
+        ),
+        optimizer_with_attributes(Mosek.Optimizer,
+            "QUIET"=>true,
+            "INTPNT_CO_TOL_DFEAS"=>tol,
+            "INTPNT_CO_TOL_PFEAS"=>tol,
+            "INTPNT_CO_TOL_MU_RED"=>tol,
+            "INTPNT_CO_TOL_REL_GAP"=>tol,
+            "INTPNT_QO_TOL_DFEAS"=>tol,
+            "INTPNT_QO_TOL_PFEAS"=>tol,
+            "INTPNT_QO_TOL_MU_RED"=>tol,
+            "INTPNT_QO_TOL_REL_GAP"=>tol,
+            # "INTPNT_QO_TOL_DFEAS"=>1e-4,
+            # "INTPNT_QO_TOL_PFEAS"=>1e-4,
+            "INTPNT_TOL_DFEAS"=>tol,
+            "INTPNT_TOL_PFEAS"=>tol,
+            "INTPNT_TOL_MU_RED"=>tol,
+            "INTPNT_TOL_REL_GAP"=>tol,
+        )
+    )
+    map(optimizers) do optimizer
+        solvername = MOI.get(MOI.instantiate(optimizer), MOI.SolverName())
+        println("  Running with $solvername")
+        Random.seed!(1)
+        prob_mpc = gen_tracking_problem(prob, N_mpc)
+        X_traj, res, X, U = run_Rocket_MPC(prob_mpc, opts_mpc, Z_track, num_iters=1, optimizer=optimizer) 
+        Xerr_altro = norm(X_ref - states(prob_mpc), Inf)
+        Uerr_altro = norm(U_ref - controls(prob_mpc), Inf)
+        Xerr_jump  = norm(X_ref - X, Inf) 
+        Uerr_jump  = norm(U_ref - U, Inf)
+        SA[max(Xerr_altro, Uerr_altro), max(Xerr_jump, Uerr_jump)]
+    end
 end
-tol_comp_mat = hcat(tol_comp...)
-@save "rocket.jld2" tol_comp=tol_comp_mat res=res tols=tols
+tol_comp = hcat(map(results) do res
+    m = hcat(res...)
+    insert(m[2,:],1,m[1])
+end...)
+@save joinpath(@__DIR__,"rocket.jld2") res=res tols=tols tol_comp=tol_comp
 
-plot(tols, tol_comp_mat[3,:], xscale=:log10)
-plot!(tols, tol_comp_mat[4,:])
+## Generate plot
+using PGFPlotsX
+include(joinpath("..","plotting.jl"))
+@load joinpath(@__DIR__,"rocket.jld2") res tols tol_comp
+legend = ("ALTRO","ECOS","COSMO","Mosek")
 
-
+plots = map(enumerate(legend)) do (i,label)
+    @pgf PlotInc(
+        {
+            color=colors[label],
+            "very thick",
+            mark="*",
+            "mark options"={fill=colors[label]}
+        },
+        Coordinates(tols, tol_comp[i,:])
+    )
+end
+p = @pgf Axis(
+    {
+        xlabel="solver tolerance",
+        ylabel="trajectory error",
+        ymode="log",
+        xmode="log",
+        "xmajorgrids",
+        "ymajorgrids",
+        "x dir"="reverse",
+        "legend style"={
+            "legend columns"=-1,
+            at={"(0.5,-0.35)"},
+            anchor="north"
+        }
+    },
+    plots...,
+    Legend(legend...)
+)
+pgfsave(joinpath(IMAGE_DIR,"rocket_solver_tol.tikz"),p,include_preamble=false)

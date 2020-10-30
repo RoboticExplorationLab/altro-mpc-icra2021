@@ -86,13 +86,17 @@ end
 
 # Save Results
 @save joinpath(@__DIR__, "grasp_benchmark_data.jld2") results Ns optimizers
-@load joinpath(@__DIR__, "grasp_benchmark_data.jld2") results Ns
 
-# Generate Plots
-timing_results = [results[i][1] for i=1:length(Ns)]
-p = comparison_plot(timing_results, Ns, "knot points (N)", shift=0, width=4, 
-    legend=("ALTRO","ECOS","COSMO","Mosek"))
-pgfsave(joinpath(IMAGE_DIR,"grasp_horizon_comp.tikz"), p, include_preamble=false)
+## Generate Plots
+using PGFPlotsX
+using LaTeXStrings
+include(joinpath("..","plotting.jl"))
+@load joinpath(@__DIR__, "grasp_benchmark_data.jld2") results Ns optimizers
+legend = ("ALTRO","ECOS","COSMO","Mosek")
+# timing_results = [results[i][1] for i=1:length(Ns)]
+# p = comparison_plot(timing_results, Ns, "knot points (N)", shift=0, width=4, 
+#     legend=("ALTRO","ECOS","COSMO","Mosek"))
+# pgfsave(joinpath(IMAGE_DIR,"grasp_horizon_comp.tikz"), p, include_preamble=false)
 
 
 timing_results = [copy(res[1]) for res in results[1]]
@@ -103,7 +107,6 @@ for i = 2:length(optimizers)
     end
 end
 timing_results[1][:time]
-legend=("ALTRO","ECOS","COSMO","Mosek")
 
 avg = hcat(map(timing_results) do res 
     vec(mean(res[:time], dims=1))
@@ -151,6 +154,10 @@ end
 
 p = @pgf Axis(
     {
+        "xmajorgrids",
+        "ymajorgrids",
+        xlabel=L"horizon length ($N$)",
+        ylabel="computation time (ms)",
         "legend style"={
             at={"(0.1,0.9)"},
             anchor="north west"

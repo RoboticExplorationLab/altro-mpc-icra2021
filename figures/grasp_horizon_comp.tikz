@@ -1,5 +1,5 @@
 \begin{tikzpicture}
-\begin{axis}[legend style={at={(0.1,0.9)}, anchor={north west}}]
+\begin{axis}[xmajorgrids, ymajorgrids, xlabel={horizon length ($N$)}, ylabel={computation time (ms)}, legend style={at={(0.1,0.9)}, anchor={north west}}]
     \addplot+[color={rgb,1:red,1.0;green,0.0;blue,0.0}, no markers, dashed, forget plot]
         coordinates {
             (11,0.253279)
