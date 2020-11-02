@@ -19,7 +19,6 @@ function mpc_update!(prob_mpc, o::SquareObject, k_mpc, Z_track)
     # Setup ECOS
     prob_mpc_ecos, X_ecos, U_ecos = gen_ECOS(prob_mpc, k_mpc+1, Z_track)
     con = @constraint(prob_mpc_ecos, X_ecos[:,1] .== x0) # Initial condition
-    set_name(con, "initial_condition")
 
     # Update ALTRO and ECOS Stage Constraints
     cons = prob_mpc.constraints

@@ -106,7 +106,8 @@ for i = 2:length(optimizers)
         timing_results[j][:time] = [timing_results[j][:time] res[:time][:,2]]
     end
 end
-timing_results[1][:time]
+a = [mean(res[:time][:,1]) for res in timing_results]
+println(a)
 
 avg = hcat(map(timing_results) do res 
     vec(mean(res[:time], dims=1))

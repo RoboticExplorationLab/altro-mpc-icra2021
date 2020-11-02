@@ -109,58 +109,58 @@ function run_grasp_mpc(prob_mpc, opts_mpc, Z_track,
 end
 
 ## MPC Setup
-o = SquareObject()
-prob_cold = GraspProblem(o,251)
-opts = SolverOptions(
-    verbose = 0,
-    projected_newton=false,
-    cost_tolerance=1e-6,
-    cost_tolerance_intermediate=1e-4,
-    constraint_tolerance=1e-6
-)
-altro = ALTROSolver(prob_cold, opts, show_summary=false)
-Altro.solve!(altro)
-Z_track = get_trajectory(altro)
+# o = SquareObject()
+# prob_cold = GraspProblem(o,251)
+# opts = SolverOptions(
+#     verbose = 0,
+#     projected_newton=false,
+#     cost_tolerance=1e-6,
+#     cost_tolerance_intermediate=1e-4,
+#     constraint_tolerance=1e-6
+# )
+# altro = ALTROSolver(prob_cold, opts, show_summary=false)
+# Altro.solve!(altro)
+# Z_track = get_trajectory(altro)
 
-Random.seed!(1)
-opts_mpc = SolverOptions(
-    cost_tolerance=1e-4,
-    cost_tolerance_intermediate=1e-3,
-    constraint_tolerance=1e-4,
-    projected_newton=false,
-    penalty_initial=10_000.,
-    penalty_scaling=100.,
-    # reset_duals = false,
-)
-num_iters = 20 # number of MPC iterations
-N_mpc = 21 # length of the MPC horizon in number of steps
+# Random.seed!(1)
+# opts_mpc = SolverOptions(
+#     cost_tolerance=1e-4,
+#     cost_tolerance_intermediate=1e-3,
+#     constraint_tolerance=1e-4,
+#     projected_newton=false,
+#     penalty_initial=10_000.,
+#     penalty_scaling=100.,
+#     # reset_duals = false,
+# )
+# num_iters = 20 # number of MPC iterations
+# N_mpc = 21 # length of the MPC horizon in number of steps
 
 
-Q = 1e3
-R = 1e0
-Qf = 10.0
+# Q = 1e3
+# R = 1e0
+# Qf = 10.0
 
-iter = 1
-prob_mpc = gen_tracking_problem(prob_cold, N_mpc, Qk = Q, Rk = R, Qfk = Qf)
-prob_mpc_ecos, X_ecos, U_ecos = mpc_update!(prob_mpc, o, iter, Z_track)
-set_start_value.(X_ecos, zeros(size(X_ecos)))
+# iter = 1
+# prob_mpc = gen_tracking_problem(prob_cold, N_mpc, Qk = Q, Rk = R, Qfk = Qf)
+# prob_mpc_ecos, X_ecos, U_ecos = mpc_update!(prob_mpc, o, iter, Z_track)
+# set_start_value.(X_ecos, zeros(size(X_ecos)))
 
-m = prob_mpc_ecos
-set_optimizer(m, optimizer)
-optimize!(m)
-l = list_of_constraint_types(m)
-duals = [dual.(all_constraints(prob_mpc_ecos, l...)) 
-    for l in list_of_constraint_types(prob_mpc_ecos)]
-l = list_of_constraint_types(m)
-duals = [dual.(all_constraints(m, li...)) for li in l]
-set_dual_start_value.(all_constraints(m, l[1]...), duals[1])
+# m = prob_mpc_ecos
+# set_optimizer(m, optimizer)
+# optimize!(m)
+# l = list_of_constraint_types(m)
+# duals = [dual.(all_constraints(prob_mpc_ecos, l...)) 
+#     for l in list_of_constraint_types(prob_mpc_ecos)]
+# l = list_of_constraint_types(m)
+# duals = [dual.(all_constraints(m, li...)) for li in l]
+# set_dual_start_value.(all_constraints(m, l[1]...), duals[1])
 
-# Test single run
-num_iters = 100
-print_all = false 
-res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts_mpc, Z_track,
-                                            num_iters, print_all=print_all)
-println(mean(res[:iter]))
+# # Test single run
+# num_iters = 100
+# print_all = false 
+# res, altro_traj, ecos_controls = run_grasp_mpc(prob_mpc, opts_mpc, Z_track,
+#                                             num_iters, print_all=print_all)
+# println(mean(res[:iter]))
 
 
 ## Histogram of timing results
