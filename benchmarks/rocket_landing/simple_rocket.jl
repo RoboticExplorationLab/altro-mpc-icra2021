@@ -56,7 +56,7 @@ function gen_JuMP_rocket(prob::Problem, opts::SolverOptions, optimizer;
     return model, z, (P,q,c)
 end
 
-function mpc_update(altro, prob_mpc, Z_track, t0, k_mpc)
+function mpc_update(altro, prob_mpc, Z_track, t0, k_mpc; wp=1/1000, wv=1/100)
     TO.set_initial_time!(prob_mpc, t0)
 
     # Propagate the system forward w/ noise
@@ -65,8 +65,8 @@ function mpc_update(altro, prob_mpc, Z_track, t0, k_mpc)
     pos_mag = norm(x0[1:3])
     vel_mag = norm(x0[4:6])
     noise = [
-        (@SVector randn(3)) * pos_mag / 1000; 
-        (@SVector randn(3)) * vel_mag / 100
+        (@SVector randn(3)) * pos_mag * wp; 
+        (@SVector randn(3)) * vel_mag * wv
     ]
     x0 += noise
     TO.set_initial_state!(prob_mpc, x0)
@@ -113,7 +113,9 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track;
             "reltol"=>opts_mpc.cost_tolerance
         ),
         benchmark=false,
-        tol0 = nothing 
+        tol0 = nothing,
+        wv=1/100,   # noise on velocity
+        wp=1/1000   # noise on position
     )
     # Setup and solve the first iteration
     opts0 = copy(opts_mpc)
@@ -139,6 +141,7 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track;
     iters = zeros(Int, num_iters,2)
     times = zeros(num_iters,2)
     costs = zeros(num_iters,3)
+    status = fill(Altro.UNSOLVED, num_iters)
     X = zero.(states(prob_mpc))
     U = zero.(controls(prob_mpc))
 
@@ -157,7 +160,7 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track;
         k_mpc += 1
 
         # Update the ALTRO solution, advancing forward by 1 time step
-        mpc_update(altro, prob_mpc, Z_track, t0, k_mpc)
+        mpc_update(altro, prob_mpc, Z_track, t0, k_mpc, wp=wp, wv=wv)
         X_traj[i+1] = prob_mpc.x0
 
         # Generate a JuMP Model for solving the problem with ECOS
@@ -175,6 +178,7 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track;
         times[i,1] = altro.stats.tsolve
         times[i,2] = JuMP.solve_time(model) * 1000
         iters[i,1] = iterations(altro)
+        status[i] = Altro.status(altro)
 
         # Compare trajectories
         x_ecos = value.(z)
@@ -198,7 +202,7 @@ function run_Rocket_MPC(prob_mpc, opts_mpc, Z_track;
         costs[i,2] = J_ecos2  # equivalent cost
         costs[i,3] = J_ecos   # includes slack variables?
     end
-    X_traj, Dict(:time=>times, :iter=>iters, :cost=>costs, :err_traj=>err_traj), X, U, altro
+    X_traj, Dict(:time=>times, :iter=>iters, :cost=>costs, :err_traj=>err_traj, :status=>status), X, U, altro
 end
 
 function dynamics_violation(prob,X,U)
@@ -209,6 +213,10 @@ function dynamics_violation(prob,X,U)
         err = discrete_dynamics(TO.integration(prob), prob.model, X[k], U[k], t, dt) - X[k+1]
     end
     return maximum(norm.(err,Inf))
+end
+
+function altro_prob(prob_mpc::Problem)
+    
 end
 
 

@@ -34,6 +34,7 @@ end
 @inline TrajectoryOptimization.sense(con::NormConstraint2) = con.sense
 # @inline Base.length(::NormConstraint2) = 1
 @inline Base.length(::NormConstraint2{TrajectoryOptimization.SecondOrderCone,D}) where D = D + 1
+@inline Base.length(::NormConstraint2) = 1 
 
 function TrajectoryOptimization.evaluate(
                 con::NormConstraint2{TrajectoryOptimization.SecondOrderCone},
@@ -48,6 +49,28 @@ function TrajectoryOptimization.jacobian!(∇c,
     ∇c[1:length(con.inds),con.inds] = con.A
     ∇c[1+length(con.inds),con.inds] = con.c
     return true
+end
+
+function TrajectoryOptimization.evaluate(
+                con::NormConstraint2,
+                z::AbstractKnotPoint)
+    x = z.z[con.inds]
+    v = con.A*x
+    s = con.c'x
+    return SA[v'v - s*s]
+end
+
+function TrajectoryOptimization.jacobian!(∇c,
+                con::NormConstraint2,
+                z::AbstractKnotPoint)
+    A,c = SMatrix(con.A), con.c
+    jac = A'A - c*c' 
+    x = z.z[con.inds]
+    jac = jac * x
+    for (i,j) in enumerate(con.inds)
+        ∇c[j] = 2*jac[i]
+    end
+    return false
 end
 
 function TrajectoryOptimization.change_dimension(con::NormConstraint2,

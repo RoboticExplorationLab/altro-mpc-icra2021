@@ -57,7 +57,8 @@ function RocketProblem(N=101, tf=10.0;
         include_goal = true,
         include_thrust_angle = true,
         include_glideslope = true,
-        integration=RD.Exponential
+        integration=RD.Exponential,
+        contype = TrajectoryOptimization.SecondOrderCone()
     )
     """
     Model
@@ -119,7 +120,7 @@ function RocketProblem(N=101, tf=10.0;
         @assert perWeightMax > 1
         u_bnd = mass * abs(grav[3]) * perWeightMax
         @show u_bnd
-        maxThrust = NormConstraint(n, m, u_bnd, TO.SecondOrderCone(), :control)
+        maxThrust = NormConstraint(n, m, u_bnd, contype, :control)
         TO.add_constraint!(cons, maxThrust, 1:N-1)
     end
 
@@ -139,7 +140,7 @@ function RocketProblem(N=101, tf=10.0;
         ]
         cRocket = SA_F64[0, 0, α_max]
         maxAngle = NormConstraint2(n, m, ARocket, cRocket,
-                                        TO.SecondOrderCone(), :control)
+                                        contype, :control)
         TO.add_constraint!(cons, maxAngle, 1:N-1)
     end
 
@@ -162,7 +163,7 @@ function RocketProblem(N=101, tf=10.0;
         ]
         cGlide = SA_F64[0, 0, α_glide, 0, 0, 0]
         glideslope = NormConstraint2(n, m, AGlide, cGlide,
-                                        TO.SecondOrderCone(), :state)
+                                        contype, :state)
         TO.add_constraint!(cons, glideslope, glide_recover_k:N-1)
     end
 
